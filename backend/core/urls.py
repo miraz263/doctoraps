@@ -1,20 +1,27 @@
-# core/urls.py
 from django.urls import path, include
+from .views import home 
 from rest_framework import routers
-from .views import (TenantViewSet, UserViewSet, DoctorProfileViewSet,
-                    PatientViewSet, AppointmentViewSet, PrescriptionViewSet)
+from .views import (
+    TenantViewSet, UserViewSet, DoctorProfileViewSet,
+    PatientViewSet, FamilyMemberViewSet, AppointmentViewSet,
+    PrescriptionViewSet, PaymentViewSet, DoctorAvailabilityViewSet
+)
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 router = routers.DefaultRouter()
-router.register(r'tenants', TenantViewSet, basename='tenants')
-router.register(r'users', UserViewSet, basename='users')
-router.register(r'doctors', DoctorProfileViewSet, basename='doctors')
-router.register(r'patients', PatientViewSet, basename='patients')
-router.register(r'appointments', AppointmentViewSet, basename='appointments')
-router.register(r'prescriptions', PrescriptionViewSet, basename='prescriptions')
+router.register(r'tenants', TenantViewSet)
+router.register(r'users', UserViewSet)
+router.register(r'doctors', DoctorProfileViewSet)
+router.register(r'patients', PatientViewSet)
+router.register(r'family', FamilyMemberViewSet)
+router.register(r'appointments', AppointmentViewSet)
+router.register(r'prescriptions', PrescriptionViewSet)
+router.register(r'payments', PaymentViewSet)
+router.register(r'doctor-availability', DoctorAvailabilityViewSet)
 
 urlpatterns = [
-    path('auth/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),     # /{tenant_slug}/api/auth/token/
+    path('', home),  # API root test
+    path('auth/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('auth/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
-    path('', include(router.urls)),
+    path('api/', include(router.urls)), 
 ]

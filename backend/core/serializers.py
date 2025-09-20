@@ -1,41 +1,47 @@
-# core/serializers.py
 from rest_framework import serializers
-from .models import Tenant, User, DoctorProfile, Patient, Appointment, Prescription
-from django.contrib.auth import get_user_model
-UserModel = get_user_model()
+from .models import Tenant, User, DoctorProfile, Patient, FamilyMember, Appointment, Prescription, Payment, DoctorAvailability
 
 class TenantSerializer(serializers.ModelSerializer):
     class Meta:
         model = Tenant
-        fields = ['id','name','slug','plan','created_at']
+        fields = '__all__'
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
-        model = UserModel
-        fields = ['id','username','email','first_name','last_name','role','phone','tenant']
-        read_only_fields = ['tenant']  # tenant assigned from URL or admin
+        model = User
+        fields = '__all__'
 
 class DoctorProfileSerializer(serializers.ModelSerializer):
-    user = UserSerializer(read_only=True)
-    user_id = serializers.PrimaryKeyRelatedField(write_only=True, queryset=UserModel.objects.all(), source='user')
     class Meta:
         model = DoctorProfile
-        fields = ['id','user','user_id','specialization','consultation_fee','working_hours']
+        fields = '__all__'
 
 class PatientSerializer(serializers.ModelSerializer):
     class Meta:
         model = Patient
-        fields = ['id','tenant','name','dob','phone','email','address']
-        read_only_fields = ['tenant']
+        fields = '__all__'
+
+class FamilyMemberSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = FamilyMember
+        fields = '__all__'
 
 class AppointmentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Appointment
-        fields = ['id','tenant','doctor','patient','start_time','end_time','status','created_at']
-        read_only_fields = ['tenant','created_at']
+        fields = '__all__'
 
 class PrescriptionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Prescription
-        fields = ['id','tenant','doctor','patient','appointment','diagnosis','medicines','created_at']
-        read_only_fields = ['tenant','created_at']
+        fields = '__all__'
+
+class PaymentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Payment
+        fields = '__all__'
+
+class DoctorAvailabilitySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DoctorAvailability
+        fields = '__all__'
