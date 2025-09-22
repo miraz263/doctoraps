@@ -1,14 +1,10 @@
-import Navbar from "./Navbar";
 import Sidebar from "./Sidebar";
 
-export default function Dashboard({ children }) {
+export default function Dashboard({ children, setPage, onLogout }) {
   return (
-    <div className="h-screen flex flex-col bg-gray-100">
-      <Navbar />
-      <div className="flex flex-1 overflow-hidden">
-        <Sidebar />
-        <main className="flex-1 p-6 overflow-y-auto">{children}</main>
-      </div>
+    <div className="flex">
+      <Sidebar setPage={setPage} onLogout={onLogout} />
+      <main className="flex-1 p-6 bg-gray-100">{children}</main>
     </div>
   );
 }

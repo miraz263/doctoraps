@@ -1,5 +1,8 @@
 from rest_framework import viewsets
 from django.http import JsonResponse
+from django.shortcuts import render, redirect
+from django.contrib.auth import authenticate, login, logout
+from django.contrib import messages
 from .models import Tenant, User, DoctorProfile, Patient, FamilyMember, Appointment, Prescription, Payment, DoctorAvailability
 from .serializers import TenantSerializer, UserSerializer, DoctorProfileSerializer, PatientSerializer, FamilyMemberSerializer, AppointmentSerializer, PrescriptionSerializer, PaymentSerializer, DoctorAvailabilitySerializer
 
@@ -41,3 +44,24 @@ class DoctorAvailabilityViewSet(viewsets.ModelViewSet):
 
 def home(request):
     return JsonResponse({'message': 'DoctorAPS API is running!'})
+
+def login_view(request):
+    if request.method == "POST":
+        username = request.POST.get("username")
+        password = request.POST.get("password")
+
+        user = authenticate(request, username=username, password=password)
+        if user is not None:
+            login(request, user)
+            return redirect("home_page")   # named url for home
+        else:
+            messages.error(request, "Invalid username or password")
+
+    return render(request, "core/login.html")
+
+def logout_view(request):
+    logout(request)
+    return redirect("login_page")
+
+def home_page(request):
+    return render(request, "core/home.html")
