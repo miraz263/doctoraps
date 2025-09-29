@@ -3,20 +3,13 @@ from django.shortcuts import render, redirect
 from django.contrib.auth import authenticate, login, logout
 from django.contrib import messages
 from django.contrib.auth.hashers import make_password
-from django.contrib.auth.models import User as DjangoUser
-
-
-
-
-
-
 
 from rest_framework_simplejwt.tokens import RefreshToken
-
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.decorators import api_view, permission_classes
 
 from .models import (
     Tenant, User, DoctorProfile, Patient, FamilyMember,
@@ -29,43 +22,52 @@ from .serializers import (
 )
 
 # -------------------------
-# Django REST Framework ViewSets
+# DRF ViewSets
 # -------------------------
 class TenantViewSet(viewsets.ModelViewSet):
     queryset = Tenant.objects.all()
     serializer_class = TenantSerializer
+    permission_classes = [IsAuthenticated]  # Only authenticated users
 
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
+    permission_classes = [IsAuthenticated]
 
 class DoctorProfileViewSet(viewsets.ModelViewSet):
     queryset = DoctorProfile.objects.all()
     serializer_class = DoctorProfileSerializer
+    permission_classes = [AllowAny]  # Public access to list doctors
 
 class PatientViewSet(viewsets.ModelViewSet):
     queryset = Patient.objects.all()
     serializer_class = PatientSerializer
+    permission_classes = [IsAuthenticated]
 
 class FamilyMemberViewSet(viewsets.ModelViewSet):
     queryset = FamilyMember.objects.all()
     serializer_class = FamilyMemberSerializer
+    permission_classes = [IsAuthenticated]
 
 class AppointmentViewSet(viewsets.ModelViewSet):
     queryset = Appointment.objects.all()
     serializer_class = AppointmentSerializer
+    permission_classes = [IsAuthenticated]
 
 class PrescriptionViewSet(viewsets.ModelViewSet):
     queryset = Prescription.objects.all()
     serializer_class = PrescriptionSerializer
+    permission_classes = [IsAuthenticated]
 
 class PaymentViewSet(viewsets.ModelViewSet):
     queryset = Payment.objects.all()
     serializer_class = PaymentSerializer
+    permission_classes = [IsAuthenticated]
 
 class DoctorAvailabilityViewSet(viewsets.ModelViewSet):
     queryset = DoctorAvailability.objects.all()
     serializer_class = DoctorAvailabilitySerializer
+    permission_classes = [IsAuthenticated]
 
 # -------------------------
 # API Home
@@ -80,14 +82,11 @@ def login_view(request):
     if request.method == "POST":
         username = request.POST.get("username")
         password = request.POST.get("password")
-
         user = authenticate(request, username=username, password=password)
-        if user is not None:
+        if user:
             login(request, user)
-            return redirect("home_page")   # redirect to home page
-        else:
-            messages.error(request, "Invalid username or password")
-
+            return redirect("home_page")
+        messages.error(request, "Invalid username or password")
     return render(request, "core/login.html")
 
 def logout_view(request):
@@ -98,7 +97,7 @@ def home_page(request):
     return render(request, "core/home.html")
 
 # -------------------------
-# DRF API - Register
+# DRF API - User Registration
 # -------------------------
 class RegisterView(APIView):
     permission_classes = [AllowAny]
@@ -120,12 +119,52 @@ class RegisterView(APIView):
             password=make_password(password)
         )
 
-        # Create JWT tokens
         refresh = RefreshToken.for_user(user)
-
         return Response({
             "message": "User registered successfully",
             "user": {"username": user.username, "email": user.email},
             "access": str(refresh.access_token),
             "refresh": str(refresh)
         }, status=status.HTTP_201_CREATED)
+
+# -------------------------
+# DRF API - Doctor Registration
+# -------------------------
+class DoctorRegisterView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        user_id = request.data.get("user_id")  # Assuming a user already exists
+        specialization = request.data.get("specialization")
+        consultation_fee = request.data.get("consultation_fee", 0)
+
+        if not user_id or not specialization:
+            return Response({"error": "User ID and specialization are required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        doctor = DoctorProfile.objects.create(
+            user=user,
+            specialization=specialization,
+            consultation_fee=consultation_fee
+        )
+
+        serializer = DoctorProfileSerializer(doctor)
+        return Response({"message": "Doctor registered successfully", "doctor": serializer.data}, status=status.HTTP_201_CREATED)
+
+# -------------------------
+# Dashboard Stats API
+# -------------------------
+@api_view(['GET'])
+@permission_classes([AllowAny])  # Public stats endpoint
+def stats_view(request):
+    data = {
+        "doctors": DoctorProfile.objects.count(),
+        "patients": Patient.objects.count(),
+        "appointments": Appointment.objects.count(),
+        "prescriptions": Prescription.objects.count(),
+    }
+    return Response(data)
