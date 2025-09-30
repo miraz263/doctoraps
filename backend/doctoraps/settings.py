@@ -86,7 +86,7 @@ WSGI_APPLICATION = 'doctoraps.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'doctoraps_db',
+        'NAME': 'doctoraps',
         'USER': 'mirazaps',
         'PASSWORD': 'saied263',
         'HOST': 'localhost',
