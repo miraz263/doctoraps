@@ -1,15 +1,15 @@
-from django.http import JsonResponse
 from django.shortcuts import render, redirect
 from django.contrib.auth import authenticate, login, logout
 from django.contrib import messages
 from django.contrib.auth.hashers import make_password
+from django.http import JsonResponse
 
-from rest_framework_simplejwt.tokens import RefreshToken
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status, serializers
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.decorators import api_view, permission_classes
+from rest_framework_simplejwt.tokens import RefreshToken
 
 from .models import (
     Tenant, User, DoctorProfile, Patient, FamilyMember,
@@ -27,7 +27,7 @@ from .serializers import (
 class TenantViewSet(viewsets.ModelViewSet):
     queryset = Tenant.objects.all()
     serializer_class = TenantSerializer
-    permission_classes = [IsAuthenticated]  # Only authenticated users
+    permission_classes = [IsAuthenticated]
 
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
@@ -37,7 +37,7 @@ class UserViewSet(viewsets.ModelViewSet):
 class DoctorProfileViewSet(viewsets.ModelViewSet):
     queryset = DoctorProfile.objects.all()
     serializer_class = DoctorProfileSerializer
-    permission_classes = [AllowAny]  # Public access to list doctors
+    permission_classes = [AllowAny]
 
 class PatientViewSet(viewsets.ModelViewSet):
     queryset = Patient.objects.all()
@@ -128,38 +128,68 @@ class RegisterView(APIView):
         }, status=status.HTTP_201_CREATED)
 
 # -------------------------
+# Serializer for Doctor Registration
+# -------------------------
+class DoctorRegisterSerializer(serializers.Serializer):
+    user_id = serializers.IntegerField()
+    specialization = serializers.CharField(max_length=255)
+    consultation_fee = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, default=0)
+
+    def validate_user_id(self, value):
+        if not User.objects.filter(id=value).exists():
+            raise serializers.ValidationError("User not found.")
+        return value
+
+# -------------------------
 # DRF API - Doctor Registration
 # -------------------------
 class DoctorRegisterView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
-        user_id = request.data.get("user_id")  # Assuming a user already exists
+        user_id = request.data.get("user_id")
         specialization = request.data.get("specialization")
         consultation_fee = request.data.get("consultation_fee", 0)
 
         if not user_id or not specialization:
-            return Response({"error": "User ID and specialization are required"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"error": "User ID and specialization are required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         try:
             user = User.objects.get(id=user_id)
         except User.DoesNotExist:
             return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        doctor = DoctorProfile.objects.create(
-            user=user,
-            specialization=specialization,
-            consultation_fee=consultation_fee
-        )
+        # ✅ Check if doctor profile already exists
+        if DoctorProfile.objects.filter(user=user).exists():
+            return Response(
+                {"error": "Doctor profile for this user already exists"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            doctor = DoctorProfile.objects.create(
+                user=user,
+                specialization=specialization,
+                consultation_fee=consultation_fee,
+            )
+        except Exception as e:
+            return Response({"error": f"Doctor creation failed: {str(e)}"},
+                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         serializer = DoctorProfileSerializer(doctor)
         return Response({"message": "Doctor registered successfully", "doctor": serializer.data}, status=status.HTTP_201_CREATED)
+
 
 # -------------------------
 # Dashboard Stats API
 # -------------------------
 @api_view(['GET'])
-@permission_classes([AllowAny])  # Public stats endpoint
+@permission_classes([AllowAny])
 def stats_view(request):
     data = {
         "doctors": DoctorProfile.objects.count(),

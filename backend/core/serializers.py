@@ -4,7 +4,6 @@ from .models import (
     Appointment, Prescription, Payment, DoctorAvailability
 )
 
-
 # -------------------------
 # Tenant Serializer
 # -------------------------
@@ -37,12 +36,49 @@ class UserSerializer(serializers.ModelSerializer):
 # Doctor Profile Serializer
 # -------------------------
 class DoctorProfileSerializer(serializers.ModelSerializer):
-    user = UserSerializer(read_only=True)
+    user_id = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.all(), source="user", write_only=True
+    )
 
     class Meta:
         model = DoctorProfile
-        fields = ['id', 'user', 'name', 'specialization', 'email', 'phone', 'created_at']
+        fields = ['id', 'user', 'user_id', 'name', 'specialization',
+                  'consultation_fee', 'working_hours', 'bio', 'created_at']
         read_only_fields = ['id', 'created_at']
+
+
+
+    def validate(self, attrs):
+        user = attrs.get('user')
+        specialization = attrs.get('specialization')
+
+        if not user:
+            # ফ্রন্টএন্ডে key: user_id
+            raise serializers.ValidationError({'user_id': 'This field is required.'})
+
+        if not specialization:
+            raise serializers.ValidationError({'specialization': 'This field is required.'})
+
+        # Create কেসে এক ইউজারের জন্য ডুপ্লিকেট DoctorProfile আটকান
+        if self.instance is None:
+            if DoctorProfile.objects.filter(user=user).exists():
+                raise serializers.ValidationError({'user_id': 'DoctorProfile already exists for this user.'})
+        else:
+            # Update কেসে user বদলাতে চাইলে ডুপ্লিকেট চেক
+            if self.instance.user != user and DoctorProfile.objects.filter(user=user).exists():
+                raise serializers.ValidationError({'user_id': 'Another DoctorProfile already exists for this user.'})
+
+        return attrs
+
+    def create(self, validated_data):
+        user = validated_data.get('user')
+        # name/email না থাকলে user থেকে অটো-ফিল
+        if not validated_data.get('name'):
+            full_name = f"{user.first_name} {user.last_name}".strip()
+            validated_data['name'] = full_name or user.username or user.email or 'Doctor'
+        if not validated_data.get('email'):
+            validated_data['email'] = user.email or ''
+        return super().create(validated_data)
 
 
 # -------------------------
