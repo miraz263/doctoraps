@@ -12,6 +12,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.authtoken.models import Token
 
+
 from .models import (
     Tenant, User, DoctorProfile, Patient, FamilyMember,
     Appointment, Prescription, Payment, DoctorAvailability
@@ -196,26 +197,32 @@ class LoginAPIView(APIView):
         role = request.data.get("role")
 
         user = authenticate(username=username, password=password)
-        if user:
-            if getattr(user, "role", None) != role:
-                return Response({"error": "Role mismatch"}, status=400)
+        if user is None:
+            return Response({"error": "Invalid credentials"}, status=401)
 
-            token, _ = Token.objects.get_or_create(user=user)
+        # Role check (optional)
+        if hasattr(user, "role") and user.role != role:
+            return Response({"error": "Role mismatch"}, status=400)
 
-            dashboard_map = {
-                "doctor": "/dashboard/doctor",
-                "patient": "/dashboard/patient",
-                "agent": "/dashboard/agent",
-                "management": "/dashboard/management",
-                "admin": "/dashboard/admin",
-            }
+        # Generate JWT
+        refresh = RefreshToken.for_user(user)
+        access_token = str(refresh.access_token)
 
-            return Response({
-                "token": token.key,
-                "dashboard_url": dashboard_map.get(role, "/dashboard")
-            })
+        # Role-based dashboard
+        dashboard_map = {
+            "doctor": "/dashboard/doctor",
+            "patient": "/dashboard/patient",
+            "agent": "/dashboard/agent",
+            "management": "/dashboard/management",
+            "admin": "/dashboard/admin",
+        }
 
-        return Response({"error": "Invalid credentials"}, status=401)
+        return Response({
+            "token": access_token,
+            "dashboard_url": dashboard_map.get(role, "/dashboard"),
+            "username": user.username
+        }, status=200)
+
 
 # -------------------------
 # Dashboard Stats API

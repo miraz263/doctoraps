@@ -12,7 +12,8 @@ from core.views import (
     RegisterView, DoctorRegisterView, stats_view,
     TenantViewSet, UserViewSet, DoctorProfileViewSet,
     PatientViewSet, FamilyMemberViewSet, AppointmentViewSet,
-    PrescriptionViewSet, PaymentViewSet, DoctorAvailabilityViewSet
+    PrescriptionViewSet, PaymentViewSet, DoctorAvailabilityViewSet,
+    LoginAPIView  # ✅ Add this import
 )
 
 # -------------------------
@@ -56,6 +57,9 @@ urlpatterns = [
 
     # Dashboard Stats API
     path('api/stats/', stats_view, name='stats'),
+
+    # Custom Login API
+    path('api/login/', LoginAPIView.as_view(), name='login'),  # ✅ Add this line
 
     # Global API endpoints from ViewSets
     path('api/', include(router.urls)),
