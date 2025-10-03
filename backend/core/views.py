@@ -1,17 +1,13 @@
 from django.shortcuts import render, redirect
 from django.contrib.auth import authenticate, login, logout
-from django.contrib import messages
 from django.contrib.auth.hashers import make_password
-from django.http import JsonResponse
+from django.contrib import messages
 
-from rest_framework import viewsets, status, serializers
+from rest_framework import viewsets, status, serializers, permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework_simplejwt.tokens import RefreshToken
-from rest_framework.authtoken.models import Token
-
 
 from .models import (
     Tenant, User, DoctorProfile, Patient, FamilyMember,
@@ -24,63 +20,10 @@ from .serializers import (
 )
 
 # -------------------------
-# DRF ViewSets
-# -------------------------
-class TenantViewSet(viewsets.ModelViewSet):
-    queryset = Tenant.objects.all()
-    serializer_class = TenantSerializer
-    permission_classes = [IsAuthenticated]
-
-class UserViewSet(viewsets.ModelViewSet):
-    queryset = User.objects.all()
-    serializer_class = UserSerializer
-    permission_classes = [IsAuthenticated]
-
-class DoctorProfileViewSet(viewsets.ModelViewSet):
-    queryset = DoctorProfile.objects.all()
-    serializer_class = DoctorProfileSerializer
-    permission_classes = [AllowAny]
-
-class PatientViewSet(viewsets.ModelViewSet):
-    queryset = Patient.objects.all()
-    serializer_class = PatientSerializer
-    permission_classes = [IsAuthenticated]
-
-class FamilyMemberViewSet(viewsets.ModelViewSet):
-    queryset = FamilyMember.objects.all()
-    serializer_class = FamilyMemberSerializer
-    permission_classes = [IsAuthenticated]
-
-class AppointmentViewSet(viewsets.ModelViewSet):
-    queryset = Appointment.objects.all()
-    serializer_class = AppointmentSerializer
-    permission_classes = [IsAuthenticated]
-
-class PrescriptionViewSet(viewsets.ModelViewSet):
-    queryset = Prescription.objects.all()
-    serializer_class = PrescriptionSerializer
-    permission_classes = [IsAuthenticated]
-
-class PaymentViewSet(viewsets.ModelViewSet):
-    queryset = Payment.objects.all()
-    serializer_class = PaymentSerializer
-    permission_classes = [IsAuthenticated]
-
-class DoctorAvailabilityViewSet(viewsets.ModelViewSet):
-    queryset = DoctorAvailability.objects.all()
-    serializer_class = DoctorAvailabilitySerializer
-    permission_classes = [IsAuthenticated]
-
-# -------------------------
-# API Home
-# -------------------------
-def home(request):
-    return JsonResponse({'message': 'DoctorAPS API is running!'})
-
-# -------------------------
-# Django Auth Views
+# Django HTML Views
 # -------------------------
 def login_view(request):
+    """Render login page and handle Django form login (optional)."""
     if request.method == "POST":
         username = request.POST.get("username")
         password = request.POST.get("password")
@@ -91,105 +34,157 @@ def login_view(request):
         messages.error(request, "Invalid username or password")
     return render(request, "core/login.html")
 
+
 def logout_view(request):
+    """Logout user and redirect to login page."""
     logout(request)
     return redirect("login_page")
 
+
 def home_page(request):
+    """Render home page for logged-in user."""
     return render(request, "core/home.html")
+
+
+# -------------------------
+# DRF ViewSets
+# -------------------------
+class TenantViewSet(viewsets.ModelViewSet):
+    queryset = Tenant.objects.all()
+    serializer_class = TenantSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+
+class UserViewSet(viewsets.ModelViewSet):
+    queryset = User.objects.all()
+    serializer_class = UserSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+
+class DoctorProfileViewSet(viewsets.ModelViewSet):
+    queryset = DoctorProfile.objects.all()
+    serializer_class = DoctorProfileSerializer
+    permission_classes = [permissions.AllowAny]
+
+
+class PatientViewSet(viewsets.ModelViewSet):
+    queryset = Patient.objects.all()
+    serializer_class = PatientSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+
+class FamilyMemberViewSet(viewsets.ModelViewSet):
+    queryset = FamilyMember.objects.all()
+    serializer_class = FamilyMemberSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+
+class AppointmentViewSet(viewsets.ModelViewSet):
+    queryset = Appointment.objects.all()
+    serializer_class = AppointmentSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+
+class PrescriptionViewSet(viewsets.ModelViewSet):
+    queryset = Prescription.objects.all()
+    serializer_class = PrescriptionSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+
+class PaymentViewSet(viewsets.ModelViewSet):
+    queryset = Payment.objects.all()
+    serializer_class = PaymentSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+
+class DoctorAvailabilityViewSet(viewsets.ModelViewSet):
+    queryset = DoctorAvailability.objects.all()
+    serializer_class = DoctorAvailabilitySerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+
+# -------------------------
+# API Home (JSON response)
+# -------------------------
+@api_view(['GET'])
+@permission_classes([permissions.AllowAny])
+def home(request):
+    """Return API running message (for React front-end)."""
+    return Response({'message': 'DoctorAPS API is running!'})
+
 
 # -------------------------
 # DRF API - User Registration
 # -------------------------
 class RegisterView(APIView):
-    permission_classes = [AllowAny]
+    permission_classes = [permissions.AllowAny]
 
     def post(self, request):
         username = request.data.get("username")
         password = request.data.get("password")
         email = request.data.get("email")
+        role = request.data.get("role", "patient")  # default role
 
         if not username or not password:
-            return Response({"error": "Username and password are required"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"error": "Username and password are required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         if User.objects.filter(username=username).exists():
-            return Response({"error": "Username already taken"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"error": "Username already taken"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         user = User.objects.create(
             username=username,
             email=email,
-            password=make_password(password)
+            password=make_password(password),
+            role=role
         )
 
         refresh = RefreshToken.for_user(user)
         return Response({
-            "message": "User registered successfully",
-            "user": {"username": user.username, "email": user.email},
+            "id": user.id,
+            "username": user.username,
+            "role": user.role,
             "access": str(refresh.access_token),
             "refresh": str(refresh)
         }, status=status.HTTP_201_CREATED)
 
-# -------------------------
-# Serializer for Doctor Registration
-# -------------------------
-class DoctorRegisterSerializer(serializers.Serializer):
-    user_id = serializers.IntegerField()
-    specialization = serializers.CharField(max_length=255)
-    consultation_fee = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, default=0)
-
-    def validate_user_id(self, value):
-        if not User.objects.filter(id=value).exists():
-            raise serializers.ValidationError("User not found.")
-        return value
 
 # -------------------------
 # DRF API - Doctor Registration
 # -------------------------
 class DoctorRegisterView(APIView):
-    permission_classes = [AllowAny]
+    permission_classes = [permissions.IsAuthenticated]  # must provide JWT
 
     def post(self, request):
         user_id = request.data.get("user_id")
-        specialization = request.data.get("specialization")
+        specialization = request.data.get("specialization", "General")
         consultation_fee = request.data.get("consultation_fee", 0)
-
-        if not user_id or not specialization:
-            return Response(
-                {"error": "User ID and specialization are required"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
 
         try:
             user = User.objects.get(id=user_id)
-        except User.DoesNotExist:
-            return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
-        except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-        if DoctorProfile.objects.filter(user=user).exists():
-            return Response(
-                {"error": "Doctor profile for this user already exists"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        try:
-            doctor = DoctorProfile.objects.create(
+            doctor_profile = DoctorProfile.objects.create(
                 user=user,
                 specialization=specialization,
-                consultation_fee=consultation_fee,
+                consultation_fee=consultation_fee
             )
+            serializer = DoctorProfileSerializer(doctor_profile)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        except User.DoesNotExist:
+            return Response({"error": "User not found"}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
-            return Response({"error": f"Doctor creation failed: {str(e)}"},
-                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-        serializer = DoctorProfileSerializer(doctor)
-        return Response({"message": "Doctor registered successfully", "doctor": serializer.data}, status=status.HTTP_201_CREATED)
 
 # -------------------------
 # DRF API - Login with role
 # -------------------------
 class LoginAPIView(APIView):
-    permission_classes = [AllowAny]
+    permission_classes = [permissions.AllowAny]
 
     def post(self, request):
         username = request.data.get("username")
@@ -198,17 +193,14 @@ class LoginAPIView(APIView):
 
         user = authenticate(username=username, password=password)
         if user is None:
-            return Response({"error": "Invalid credentials"}, status=401)
+            return Response({"error": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
 
-        # Role check (optional)
+        # Optional role validation
         if hasattr(user, "role") and user.role != role:
-            return Response({"error": "Role mismatch"}, status=400)
+            return Response({"error": "Role mismatch"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Generate JWT
         refresh = RefreshToken.for_user(user)
-        access_token = str(refresh.access_token)
 
-        # Role-based dashboard
         dashboard_map = {
             "doctor": "/dashboard/doctor",
             "patient": "/dashboard/patient",
@@ -218,17 +210,19 @@ class LoginAPIView(APIView):
         }
 
         return Response({
-            "token": access_token,
-            "dashboard_url": dashboard_map.get(role, "/dashboard"),
-            "username": user.username
-        }, status=200)
+            "access": str(refresh.access_token),
+            "refresh": str(refresh),
+            "dashboard_url": dashboard_map.get(role, "/home"),
+            "username": user.username,
+            "role": getattr(user, "role", "")
+        }, status=status.HTTP_200_OK)
 
 
 # -------------------------
-# Dashboard Stats API
+# Stats API
 # -------------------------
 @api_view(['GET'])
-@permission_classes([AllowAny])
+@permission_classes([permissions.AllowAny])
 def stats_view(request):
     data = {
         "doctors": DoctorProfile.objects.count(),
