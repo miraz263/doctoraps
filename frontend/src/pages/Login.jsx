@@ -1,10 +1,12 @@
 import React, { useState } from "react";
+import { loginUser, registerUser } from "../api";
 
-export default function Auth({ setPage }) {
+export default function Login({ setPage }) {
   const [mode, setMode] = useState("login"); // "login" | "register"
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [role, setRole] = useState("doctor");
   const [message, setMessage] = useState("");
 
   const handleSubmit = async (e) => {
@@ -13,52 +15,38 @@ export default function Auth({ setPage }) {
 
     try {
       if (mode === "login") {
-        // --- LOGIN API ---
-        await loginUser(username, password);
+        const data = await loginUser(username, password, role);
+
+        if (data.error) throw new Error(data.error);
+
+        // Save token and username
+        localStorage.setItem("token", data.token);
+        localStorage.setItem("username", username);
+
+        // Save dashboard url for redirect
+        localStorage.setItem("dashboard_url", data.dashboard_url);
+
+        // Redirect to dashboard/home
+        window.location.href = data.dashboard_url;
       } else {
-        // --- REGISTER API ---
-        const response = await fetch("http://localhost:8000/auth/register/", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ username, password, email }),
-        });
+        // Register
+        const data = await registerUser(username, email, password, role);
 
-        const data = await response.json();
+        if (data.error) throw new Error(data.error);
 
-        if (!response.ok) throw new Error(data.error || "Registration failed");
-
+        setMessage("Registration successful! Logging in...");
         // Auto-login after registration
-        await loginUser(username, password);
-        setMessage("Registration successful! Logged in automatically.");
+        const loginData = await loginUser(username, password, role);
+
+        localStorage.setItem("token", loginData.token);
+        localStorage.setItem("username", username);
+        localStorage.setItem("dashboard_url", loginData.dashboard_url);
+
+        window.location.href = loginData.dashboard_url;
       }
     } catch (err) {
       setMessage(err.message || "Something went wrong");
     }
-  };
-
-  const loginUser = async (username, password) => {
-    const response = await fetch("http://localhost:8000/auth/token/", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, password }),
-    });
-
-    if (!response.ok) {
-      const errData = await response.json();
-      throw new Error(errData.detail || "Login failed");
-    }
-
-    const data = await response.json();
-
-    // Save tokens
-    localStorage.setItem("access", data.access);
-    localStorage.setItem("refresh", data.refresh);
-
-    // Save username for Sidebar/Navbar
-    localStorage.setItem("username", username);
-
-    // Redirect to home/dashboard
-    setPage("home");
   };
 
   return (
@@ -73,7 +61,6 @@ export default function Auth({ setPage }) {
 
         {message && <p className="text-red-500 mb-2">{message}</p>}
 
-        {/* Username */}
         <input
           type="text"
           placeholder="Username"
@@ -83,7 +70,6 @@ export default function Auth({ setPage }) {
           required
         />
 
-        {/* Email field only for register */}
         {mode === "register" && (
           <input
             type="email"
@@ -95,7 +81,6 @@ export default function Auth({ setPage }) {
           />
         )}
 
-        {/* Password */}
         <input
           type="password"
           placeholder="Password"
@@ -105,6 +90,19 @@ export default function Auth({ setPage }) {
           required
         />
 
+        {/* Role Selection */}
+        <select
+          value={role}
+          onChange={(e) => setRole(e.target.value)}
+          className="w-full border p-2 mb-3 rounded"
+        >
+          <option value="doctor">Doctor</option>
+          <option value="patient">Patient</option>
+          <option value="agent">Agent/Tennent</option>
+          <option value="management">Management</option>
+          <option value="admin">Admin</option>
+        </select>
+
         <button
           type="submit"
           className="bg-blue-600 text-white w-full py-2 rounded"
@@ -112,7 +110,6 @@ export default function Auth({ setPage }) {
           {mode === "login" ? "Login" : "Register"}
         </button>
 
-        {/* Toggle between login/register */}
         <p className="text-sm text-center mt-3">
           {mode === "login" ? (
             <>

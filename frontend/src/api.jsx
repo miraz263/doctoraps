@@ -1,19 +1,19 @@
-// api.js
-import axios from "axios";
+const BASE_URL = "http://localhost:8000/";
 
-const axiosInstance = axios.create({
-  baseURL: "http://127.0.0.1:8000/api/",
-});
+export const loginUser = async (username, password, role) => {
+  const response = await fetch(`${BASE_URL}api/login/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, password, role }),
+  });
+  return response.json();
+};
 
-axiosInstance.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem("access_token"); // বা "access"
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
-
-export default axiosInstance;
+export const registerUser = async (username, email, password, role) => {
+  const response = await fetch(`${BASE_URL}api/auth/register/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, email, password, role }),
+  });
+  return response.json();
+};

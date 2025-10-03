@@ -10,6 +10,7 @@ from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework.authtoken.models import Token
 
 from .models import (
     Tenant, User, DoctorProfile, Patient, FamilyMember,
@@ -164,7 +165,6 @@ class DoctorRegisterView(APIView):
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        # ✅ Check if doctor profile already exists
         if DoctorProfile.objects.filter(user=user).exists():
             return Response(
                 {"error": "Doctor profile for this user already exists"},
@@ -184,6 +184,38 @@ class DoctorRegisterView(APIView):
         serializer = DoctorProfileSerializer(doctor)
         return Response({"message": "Doctor registered successfully", "doctor": serializer.data}, status=status.HTTP_201_CREATED)
 
+# -------------------------
+# DRF API - Login with role
+# -------------------------
+class LoginAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        username = request.data.get("username")
+        password = request.data.get("password")
+        role = request.data.get("role")
+
+        user = authenticate(username=username, password=password)
+        if user:
+            if getattr(user, "role", None) != role:
+                return Response({"error": "Role mismatch"}, status=400)
+
+            token, _ = Token.objects.get_or_create(user=user)
+
+            dashboard_map = {
+                "doctor": "/dashboard/doctor",
+                "patient": "/dashboard/patient",
+                "agent": "/dashboard/agent",
+                "management": "/dashboard/management",
+                "admin": "/dashboard/admin",
+            }
+
+            return Response({
+                "token": token.key,
+                "dashboard_url": dashboard_map.get(role, "/dashboard")
+            })
+
+        return Response({"error": "Invalid credentials"}, status=401)
 
 # -------------------------
 # Dashboard Stats API

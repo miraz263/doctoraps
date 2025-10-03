@@ -1,6 +1,4 @@
 import { useEffect, useState } from "react";
-import axiosInstance from "../api";
-import { getAuthHeader } from "../auth";
 
 export default function Patients() {
   const [patients, setPatients] = useState([]);
@@ -13,8 +11,18 @@ export default function Patients() {
   const fetchPatients = async () => {
     try {
       setLoading(true);
-      const res = await axiosInstance.get("patients/", { headers: getAuthHeader() });
-      setPatients(res.data);
+      const token = localStorage.getItem("access");
+      const res = await fetch("http://localhost:8000/api/patients/", {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!res.ok) throw new Error("Failed to fetch patients");
+
+      const data = await res.json();
+      setPatients(data);
     } catch (err) {
       console.error("Error fetching patients:", err);
     } finally {
@@ -25,6 +33,7 @@ export default function Patients() {
   return (
     <div className="p-6">
       <h1 className="text-3xl font-bold mb-6 text-gray-800">Patients</h1>
+
       {loading ? (
         <div className="flex justify-center items-center h-64">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500"></div>
@@ -39,14 +48,19 @@ export default function Patients() {
                 <th className="px-6 py-3 text-left font-medium">ID</th>
                 <th className="px-6 py-3 text-left font-medium">Name</th>
                 <th className="px-6 py-3 text-left font-medium">Email</th>
+                <th className="px-6 py-3 text-left font-medium">Phone</th>
               </tr>
             </thead>
             <tbody>
               {patients.map((p) => (
-                <tr key={p.id} className="border-b hover:bg-green-50 transition-colors">
+                <tr
+                  key={p.id}
+                  className="border-b hover:bg-green-50 transition-colors"
+                >
                   <td className="px-6 py-3">{p.id}</td>
                   <td className="px-6 py-3">{p.name}</td>
-                  <td className="px-6 py-3">{p.email}</td>
+                  <td className="px-6 py-3">{p.email || "-"}</td>
+                  <td className="px-6 py-3">{p.phone || "-"}</td>
                 </tr>
               ))}
             </tbody>

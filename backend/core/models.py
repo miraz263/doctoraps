@@ -4,6 +4,24 @@ from django.contrib.auth.models import AbstractUser
 from django.utils import timezone
 
 # ------------------------------
+# Existing User model
+# ------------------------------
+class User(AbstractUser):
+    ROLE_CHOICES = [
+        ('doctor', 'Doctor'),
+        ('patient', 'Patient'),
+        ('agent', 'Agent/Tennent'),
+        ('management', 'Management'),
+        ('admin', 'Admin'),
+    ]
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='patient')
+
+    # ✅ Optional: string representation to include role
+    def __str__(self):
+        return f"{self.username} ({self.role})"
+
+
+# ------------------------------
 # Tenant & Users
 # ------------------------------
 class Tenant(models.Model):
@@ -18,25 +36,12 @@ class Tenant(models.Model):
         return self.name
 
 
-class User(AbstractUser):
-    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, null=True, blank=True)
-    role = models.CharField(
-        max_length=50,
-        choices=[('doctor', 'Doctor'), ('reception', 'Reception'), ('patient', 'Patient'), ('admin', 'Admin')]
-    )
-    phone = models.CharField(max_length=30, blank=True, null=True)
-
-    def __str__(self):
-        return f"{self.username} ({self.role})"
-
-
 # ------------------------------
 # Doctor & Patient Profiles
 # ------------------------------
 class DoctorProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="doctor_profile")
     name = models.CharField(max_length=200, blank=True, null=True)
-  # ✅ Doctor's Display Name
     specialization = models.CharField(max_length=200)
     consultation_fee = models.DecimalField(max_digits=10, decimal_places=2, default=0.0)
     working_hours = models.JSONField(default=dict, blank=True)

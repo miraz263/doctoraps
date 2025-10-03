@@ -19,6 +19,7 @@ from .views import (
     PaymentViewSet,
     DoctorAvailabilityViewSet,
     stats_view,
+    LoginAPIView,  # ✅ Import added
 )
 
 # -------------------------
@@ -57,6 +58,9 @@ urlpatterns = [
 
     # Dashboard Stats
     path('api/stats/', stats_view, name='stats'),
+
+    # Custom Login API (LoginAPIView)
+    path('api/login/', LoginAPIView.as_view(), name='login'),
 
     # ViewSets (Router)
     path('api/', include(router.urls)),

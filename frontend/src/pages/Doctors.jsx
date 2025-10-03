@@ -1,6 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
-import axiosInstance from "../api";
-import { getAuthHeader } from "../auth";
+import { useEffect, useMemo, useState } from "react";
 
 // Error handling helpers
 function pickMsgFromData(data) {
@@ -22,20 +20,8 @@ function pickMsgFromData(data) {
 
 function errText(err) {
   try {
-    if (!err?.response) return err?.message || "Network error";
-    const { status, statusText, data, headers, config } = err.response;
-    const url = config?.url || "";
-    const ct = (headers?.["content-type"] || "").toLowerCase();
-
-    const pretty = pickMsgFromData(data);
-    if (pretty) return `HTTP ${status} ${statusText} @ ${url} → ${pretty}`;
-
-    if (ct.includes("text/html")) {
-      return `HTTP ${status} ${statusText} @ ${url} → [HTML response truncated]`;
-    }
-
-    const brief = JSON.stringify(data)?.slice(0, 300);
-    return `HTTP ${status} ${statusText} @ ${url} → ${brief || "No details"}`;
+    if (!err?.message) return "Network error";
+    return err.message;
   } catch {
     return "Request failed.";
   }
@@ -65,26 +51,22 @@ export default function DoctorsPage() {
 
   const extractList = (data) => (Array.isArray(data) ? data : data?.results || []);
 
+  const token = localStorage.getItem("access");
+  const authHeader = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+
   // Fetch users
   useEffect(() => {
     let cancelled = false;
-    async function loadUsers(url = "users/") {
+    async function loadUsers(url = "http://localhost:8000/api/users/") {
       setLoadingUsers(true);
       try {
         const all = [];
         while (url) {
-          const { data } = await axiosInstance.get(url, { headers: getAuthHeader() });
+          const res = await fetch(url, { headers: authHeader });
+          if (!res.ok) throw new Error(`Failed to fetch users`);
+          const data = await res.json();
           all.push(...extractList(data));
-          if (!Array.isArray(data) && data?.next) {
-            try {
-              const u = new URL(data.next);
-              url = u.pathname.replace(/^\/api\//, "") + (u.search || "");
-            } catch {
-              url = data.next;
-            }
-          } else {
-            url = null;
-          }
+          url = data?.next || null;
         }
         if (!cancelled) setUsers(all);
       } catch (err) {
@@ -102,7 +84,9 @@ export default function DoctorsPage() {
     try {
       setLoadingDoctors(true);
       setDoctorsError(null);
-      const { data } = await axiosInstance.get("doctors/", { headers: getAuthHeader() });
+      const res = await fetch("http://localhost:8000/api/doctors/", { headers: authHeader });
+      if (!res.ok) throw new Error("Failed to fetch doctors");
+      const data = await res.json();
       setDoctors(extractList(data));
     } catch (err) {
       setDoctorsError(errText(err));
@@ -115,10 +99,8 @@ export default function DoctorsPage() {
     fetchDoctors();
   }, []);
 
-  // Already doctor user IDs
   const doctorUserIds = useMemo(() => doctors.map((doc) => doc.user), [doctors]);
 
-  // Filter users based on search query
   const filteredUsers = useMemo(() => {
     if (!q) return users;
     const s = q.toLowerCase();
@@ -159,9 +141,16 @@ export default function DoctorsPage() {
         phone: formData.phone || "",
       };
 
-      await axiosInstance.post("doctors/register/", payload, {
-        headers: getAuthHeader(),
+      const res = await fetch("http://localhost:8000/api/doctors/register/", {
+        method: "POST",
+        headers: authHeader,
+        body: JSON.stringify(payload),
       });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error || "Doctor registration failed");
+      }
 
       setSuccess("Doctor added successfully!");
       setFormData({ specialization: "", name: "", email: "", phone: "" });
