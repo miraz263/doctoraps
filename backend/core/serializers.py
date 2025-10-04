@@ -4,7 +4,6 @@ from .models import (
     Appointment, Prescription, Payment, DoctorAvailability
 )
 
-
 # -------------------------
 # Tenant Serializer
 # -------------------------
@@ -14,36 +13,65 @@ class TenantSerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'address', 'created_at', 'updated_at']
         read_only_fields = ['id', 'created_at', 'updated_at']
 
-
 # -------------------------
 # User Serializer
 # -------------------------
 class UserSerializer(serializers.ModelSerializer):
     full_name = serializers.SerializerMethodField()
+    role = serializers.CharField(read_only=True)  # ✅ role যোগ করা হলো
 
     class Meta:
         model = User
         fields = [
             'id', 'username', 'email', 'first_name', 'last_name',
-            'full_name', 'is_active', 'date_joined'
+            'full_name', 'role', 'is_active', 'date_joined'
         ]
         read_only_fields = ['id', 'date_joined']
 
     def get_full_name(self, obj):
         return f"{obj.first_name} {obj.last_name}".strip()
 
-
 # -------------------------
 # Doctor Profile Serializer
 # -------------------------
 class DoctorProfileSerializer(serializers.ModelSerializer):
-    user = UserSerializer(read_only=True)
+    user_id = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.all(), source="user", write_only=True
+    )
 
     class Meta:
         model = DoctorProfile
-        fields = ['id', 'user', 'name', 'specialization', 'email', 'phone', 'created_at']
+        fields = ['id', 'user', 'user_id', 'name', 'specialization',
+                  'consultation_fee', 'working_hours', 'bio', 'created_at']
         read_only_fields = ['id', 'created_at']
 
+    def validate(self, attrs):
+        user = attrs.get('user')
+        specialization = attrs.get('specialization')
+
+        if not user:
+            raise serializers.ValidationError({'user_id': 'This field is required.'})
+
+        if not specialization:
+            raise serializers.ValidationError({'specialization': 'This field is required.'})
+
+        if self.instance is None:
+            if DoctorProfile.objects.filter(user=user).exists():
+                raise serializers.ValidationError({'user_id': 'DoctorProfile already exists for this user.'})
+        else:
+            if self.instance.user != user and DoctorProfile.objects.filter(user=user).exists():
+                raise serializers.ValidationError({'user_id': 'Another DoctorProfile already exists for this user.'})
+
+        return attrs
+
+    def create(self, validated_data):
+        user = validated_data.get('user')
+        if not validated_data.get('name'):
+            full_name = f"{user.first_name} {user.last_name}".strip()
+            validated_data['name'] = full_name or user.username or user.email or 'Doctor'
+        if not validated_data.get('email'):
+            validated_data['email'] = user.email or ''
+        return super().create(validated_data)
 
 # -------------------------
 # Patient Serializer
@@ -56,7 +84,6 @@ class PatientSerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'age', 'gender', 'email', 'phone', 'doctor', 'doctor_name']
         read_only_fields = ['id']
 
-
 # -------------------------
 # Family Member Serializer
 # -------------------------
@@ -67,7 +94,6 @@ class FamilyMemberSerializer(serializers.ModelSerializer):
         model = FamilyMember
         fields = ['id', 'name', 'relationship', 'patient', 'patient_name']
         read_only_fields = ['id']
-
 
 # -------------------------
 # Appointment Serializer
@@ -84,7 +110,6 @@ class AppointmentSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['id', 'created_at']
 
-
 # -------------------------
 # Prescription Serializer
 # -------------------------
@@ -96,7 +121,6 @@ class PrescriptionSerializer(serializers.ModelSerializer):
         fields = ['id', 'appointment', 'appointment_info', 'medications', 'notes', 'created_at']
         read_only_fields = ['id', 'created_at']
 
-
 # -------------------------
 # Payment Serializer
 # -------------------------
@@ -107,7 +131,6 @@ class PaymentSerializer(serializers.ModelSerializer):
         model = Payment
         fields = ['id', 'appointment', 'appointment_info', 'amount', 'payment_date', 'status']
         read_only_fields = ['id']
-
 
 # -------------------------
 # Doctor Availability Serializer

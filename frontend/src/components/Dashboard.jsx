@@ -1,7 +1,7 @@
 import Sidebar from "./Sidebar";
 import Navbar from "./Navbar";
 
-export default function Dashboard({ children, setPage, currentPage, onLogout }) {
+export default function Dashboard({ children, setPage = () => {}, currentPage = "home", onLogout }) {
   return (
     <div className="flex h-screen">
       {/* Sidebar */}
@@ -13,9 +13,7 @@ export default function Dashboard({ children, setPage, currentPage, onLogout }) 
         <Navbar currentPage={currentPage} setPage={setPage} onLogout={onLogout} />
 
         {/* Page content */}
-        <main className="flex-1 p-6 overflow-auto">
-          {children}
-        </main>
+        <main className="flex-1 p-6 overflow-auto">{children}</main>
       </div>
     </div>
   );
