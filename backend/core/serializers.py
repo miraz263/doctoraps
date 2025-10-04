@@ -18,7 +18,7 @@ class TenantSerializer(serializers.ModelSerializer):
 # -------------------------
 class UserSerializer(serializers.ModelSerializer):
     full_name = serializers.SerializerMethodField()
-    role = serializers.CharField(read_only=True)  # ✅ role যোগ করা হলো
+    role = serializers.CharField(read_only=True)
 
     class Meta:
         model = User
@@ -36,14 +36,20 @@ class UserSerializer(serializers.ModelSerializer):
 # -------------------------
 class DoctorProfileSerializer(serializers.ModelSerializer):
     user_id = serializers.PrimaryKeyRelatedField(
-        queryset=User.objects.all(), source="user", write_only=True
+        queryset=User.objects.all(),
+        source="user",
+        write_only=True
     )
+    # Only admins can set is_verified manually
+    is_verified = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = DoctorProfile
-        fields = ['id', 'user', 'user_id', 'name', 'specialization',
-                  'consultation_fee', 'working_hours', 'bio', 'created_at']
-        read_only_fields = ['id', 'created_at']
+        fields = [
+            'id', 'user', 'user_id', 'name', 'specialization',
+            'consultation_fee', 'working_hours', 'bio', 'bmdc_no', 'is_verified', 'created_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'is_verified']
 
     def validate(self, attrs):
         user = attrs.get('user')
@@ -69,8 +75,6 @@ class DoctorProfileSerializer(serializers.ModelSerializer):
         if not validated_data.get('name'):
             full_name = f"{user.first_name} {user.last_name}".strip()
             validated_data['name'] = full_name or user.username or user.email or 'Doctor'
-        if not validated_data.get('email'):
-            validated_data['email'] = user.email or ''
         return super().create(validated_data)
 
 # -------------------------
