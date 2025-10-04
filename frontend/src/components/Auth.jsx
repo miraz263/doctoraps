@@ -37,40 +37,43 @@ export default function Auth({ setIsAuthenticated, setRole }) {
   // -------------------------
   // Register function
   // -------------------------
-  const registerUser = async () => {
-    const res = await fetch(`${BASE_URL}register/`, {
+// -------------------------
+// Register function
+// -------------------------
+const registerUser = async () => {
+  const res = await fetch(`${BASE_URL}auth/register/`, { // ✅ fixed URL
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, email, password, role }),
+  });
+
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Registration failed");
+
+  // Auto-login after registration
+  await loginUser(username, password, role);
+
+  // If role is doctor, create doctor profile
+  if (role === "doctor") {
+    const doctorRes = await fetch(`${BASE_URL}doctors/register/`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, email, password, role }),
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+      },
+      body: JSON.stringify({
+        user_id: data.id,
+        specialization: "General",
+        consultation_fee: 0,
+      }),
     });
 
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Registration failed");
+    const doctorData = await doctorRes.json();
+    if (!doctorRes.ok) throw new Error(doctorData.error || "Doctor registration failed");
+  }
 
-    // Auto-login after registration
-    await loginUser(username, password, role);
-
-    // If role is doctor, create doctor profile
-    if (role === "doctor") {
-      const doctorRes = await fetch(`${BASE_URL}doctors/register/`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
-        },
-        body: JSON.stringify({
-          user_id: data.id,
-          specialization: "General",
-          consultation_fee: 0,
-        }),
-      });
-
-      const doctorData = await doctorRes.json();
-      if (!doctorRes.ok) throw new Error(doctorData.error || "Doctor registration failed");
-    }
-
-    setMessage("Registration successful! Logged in automatically.");
-  };
+  setMessage("Registration successful! Logged in automatically.");
+};
 
   // -------------------------
   // Form submission

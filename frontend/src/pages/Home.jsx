@@ -16,6 +16,7 @@ export default function Home() {
       try {
         setLoading(true);
         const response = await axios.get("http://localhost:8000/api/stats/");
+        console.log("API Response:", response.data); // Debug
         setStats(response.data);
       } catch (err) {
         console.error(err);

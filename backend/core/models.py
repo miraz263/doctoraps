@@ -30,10 +30,11 @@ class Tenant(models.Model):
     slug = models.SlugField(unique=True)
     plan = models.CharField(max_length=50, default='free')
     created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True, null=True)
+    updated_at = models.DateTimeField(auto_now=True, null=True)  # keep null=True for old rows
 
     def __str__(self):
         return self.name
+
 
 
 # ------------------------------

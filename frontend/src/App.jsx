@@ -7,11 +7,11 @@ import Doctors from "./pages/Doctors";
 import Patients from "./pages/Patients";
 import Appointments from "./pages/Appointments";
 import Prescriptions from "./pages/Prescriptions";
-import Auth from "./components/Auth"; // Make sure path is correct
+import Auth from "./components/Auth"; // Login/Register component
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [role, setRole] = useState(""); // Logged-in user role
+  const [role, setRole] = useState(""); 
 
   // -------------------------
   // Check authentication on load
@@ -38,18 +38,11 @@ export default function App() {
   // Role-based dashboard URL
   // -------------------------
   const getDashboardUrl = () => {
-    const url = localStorage.getItem("dashboard_url");
-    if (url) return url;
-
     switch (role) {
       case "doctor":
         return "/doctors";
       case "patient":
         return "/patients";
-      case "agent":
-      case "management":
-      case "admin":
-        return "/home";
       default:
         return "/home";
     }
@@ -67,18 +60,17 @@ export default function App() {
   // -------------------------
   return (
     <BrowserRouter>
-      <Dashboard setIsAuthenticated={setIsAuthenticated} onLogout={handleLogout}>
+      <Dashboard onLogout={handleLogout}>
         <Routes>
-          {/* Main pages */}
+          {/* Default route */}
           <Route path="/" element={<Navigate to={getDashboardUrl()} replace />} />
+
+          {/* Main pages */}
           <Route path="/home" element={<Home />} />
           <Route path="/doctors" element={<Doctors />} />
           <Route path="/patients" element={<Patients />} />
           <Route path="/appointments" element={<Appointments />} />
           <Route path="/prescriptions" element={<Prescriptions />} />
-
-          {/* Role-based dashboard redirect */}
-          <Route path="/dashboard" element={<Navigate to={getDashboardUrl()} replace />} />
 
           {/* Catch-all unknown routes */}
           <Route path="*" element={<Navigate to={getDashboardUrl()} replace />} />
