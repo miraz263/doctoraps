@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     'core',
     'rest_framework_simplejwt',
     'corsheaders',# if you use React frontend on different port
+    
 ]
 
 MIDDLEWARE = [
@@ -56,6 +57,7 @@ MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'core.middleware.TenantMiddleware',
+    
 ]
 
 ROOT_URLCONF = 'doctoraps.urls'
@@ -154,3 +156,11 @@ SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
 }
+
+
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+]
+CORS_ALLOW_ALL_ORIGINS = True
+AUTH_USER_MODEL = 'core.User'
+

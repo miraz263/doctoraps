@@ -1,33 +1,65 @@
 """
 URL configuration for doctoraps project.
-
-The `urlpatterns` list routes URLs to views. For more information please see:
-    https://docs.djangoproject.com/en/5.2/topics/http/urls/
-Examples:
-Function views
-    1. Add an import:  from my_app import views
-    2. Add a URL to urlpatterns:  path('', views.home, name='home')
-Class-based views
-    1. Add an import:  from other_app.views import Home
-    2. Add a URL to urlpatterns:  path('', Home.as_view(), name='home')
-Including another URLconf
-    1. Import the include() function: from django.urls import include, path
-    2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 
 from django.contrib import admin
 from django.urls import path, include
-from core.views import home
+from rest_framework import routers
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
+from core.views import (
+    home, home_page, login_view, logout_view,
+    RegisterView, DoctorRegisterView, stats_view,
+    TenantViewSet, UserViewSet, DoctorProfileViewSet,
+    PatientViewSet, FamilyMemberViewSet, AppointmentViewSet,
+    PrescriptionViewSet, PaymentViewSet, DoctorAvailabilityViewSet
+)
+
+# -------------------------
+# DRF Router setup
+# -------------------------
+router = routers.DefaultRouter()
+router.register(r'tenants', TenantViewSet)
+router.register(r'users', UserViewSet)
+router.register(r'doctors', DoctorProfileViewSet)
+router.register(r'patients', PatientViewSet)
+router.register(r'family', FamilyMemberViewSet)
+router.register(r'appointments', AppointmentViewSet)
+router.register(r'prescriptions', PrescriptionViewSet)
+router.register(r'payments', PaymentViewSet)
+router.register(r'doctor-availability', DoctorAvailabilityViewSet)
+
+# -------------------------
+# URL Patterns
+# -------------------------
 urlpatterns = [
+    # Django Admin
     path('admin/', admin.site.urls),
 
-    # Public home page
+    # Public Home Page (API root)
     path('', home, name='home'),
 
-    # Tenant-specific endpoints: /<tenant_slug>/api/...
-    path('<slug:tenant_slug>/api/', include('core.urls')),
+    # Django Auth (HTML views)
+    path('login/', login_view, name="login_page"),
+    path('logout/', logout_view, name="logout_page"),
+    path('home/', home_page, name="home_page"),
 
-    # Public/global API endpoints
-    path('api/', include('core.urls')),
+    # JWT Authentication
+    path('auth/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('auth/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+
+    # User Registration (API)
+    path('auth/register/', RegisterView.as_view(), name='register'),
+
+    # Doctor Registration (API)
+    path('api/doctors/register/', DoctorRegisterView.as_view(), name='doctor_register'),
+
+    # Dashboard Stats API
+    path('api/stats/', stats_view, name='stats'),
+
+    # Global API endpoints from ViewSets
+    path('api/', include(router.urls)),
+
+    # Optional: Tenant-specific API endpoints
+    path('<slug:tenant_slug>/api/', include(router.urls)),
 ]
