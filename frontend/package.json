@@ -6,6 +6,7 @@
     "dependencies": {
         "@headlessui/react": "^2.2.8",
         "@heroicons/react": "^2.2.0",
+        "aos": "^2.3.4",
         "axios": "^1.12.2",
         "jwt-decode": "^4.0.0",
         "lucide-react": "^0.544.0",
