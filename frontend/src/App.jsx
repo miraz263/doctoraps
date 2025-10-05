@@ -8,10 +8,13 @@ import Patients from "./pages/Patients";
 import Appointments from "./pages/Appointments";
 import Prescriptions from "./pages/Prescriptions";
 import Auth from "./components/Auth"; // Login/Register component
+import LandingPage from "./pages/LandingPage"; // New landing page
+import { UserProvider } from "./components/UserContext";
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [role, setRole] = useState(""); 
+  const [role, setRole] = useState("");
+  const [page, setPage] = useState("landing"); // landing | auth
 
   // -------------------------
   // Check authentication on load
@@ -32,6 +35,7 @@ export default function App() {
     localStorage.clear();
     setIsAuthenticated(false);
     setRole("");
+    setPage("landing"); // redirect to landing page after logout
   };
 
   // -------------------------
@@ -49,33 +53,39 @@ export default function App() {
   };
 
   // -------------------------
-  // Show login/register if not authenticated
+  // Show authenticated app with dashboard
   // -------------------------
-  if (!isAuthenticated) {
-    return <Auth setIsAuthenticated={setIsAuthenticated} setRole={setRole} />;
+  if (isAuthenticated) {
+    return (
+      <UserProvider>
+        <BrowserRouter>
+          <Dashboard onLogout={handleLogout}>
+            <Routes>
+              {/* Default route */}
+              <Route path="/" element={<Navigate to={getDashboardUrl()} replace />} />
+
+              {/* Main pages */}
+              <Route path="/home" element={<Home />} />
+              <Route path="/doctors" element={<Doctors />} />
+              <Route path="/patients" element={<Patients />} />
+              <Route path="/appointments" element={<Appointments />} />
+              <Route path="/prescriptions" element={<Prescriptions />} />
+
+              {/* Catch-all unknown routes */}
+              <Route path="*" element={<Navigate to={getDashboardUrl()} replace />} />
+            </Routes>
+          </Dashboard>
+        </BrowserRouter>
+      </UserProvider>
+    );
   }
 
   // -------------------------
-  // Render authenticated app with dashboard
+  // Show landing or login/register for unauthenticated users
   // -------------------------
-  return (
-    <BrowserRouter>
-      <Dashboard onLogout={handleLogout}>
-        <Routes>
-          {/* Default route */}
-          <Route path="/" element={<Navigate to={getDashboardUrl()} replace />} />
-
-          {/* Main pages */}
-          <Route path="/home" element={<Home />} />
-          <Route path="/doctors" element={<Doctors />} />
-          <Route path="/patients" element={<Patients />} />
-          <Route path="/appointments" element={<Appointments />} />
-          <Route path="/prescriptions" element={<Prescriptions />} />
-
-          {/* Catch-all unknown routes */}
-          <Route path="*" element={<Navigate to={getDashboardUrl()} replace />} />
-        </Routes>
-      </Dashboard>
-    </BrowserRouter>
+  return page === "landing" ? (
+    <LandingPage goToLogin={() => setPage("auth")} />
+  ) : (
+    <Auth setIsAuthenticated={setIsAuthenticated} setRole={setRole} />
   );
 }

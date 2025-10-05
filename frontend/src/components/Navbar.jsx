@@ -1,16 +1,22 @@
 import React from "react";
 
-export default function Navbar({ onLogout }) {
+export default function Navbar({ onLogout, username = "User" }) {
   return (
-    <div className="h-16 bg-white shadow flex items-center justify-between px-6">
-      <h1 className="text-xl font-bold">Dashboard</h1>
+    <nav className="flex justify-between items-center p-4 bg-white shadow-md">
+      {/* Welcome message */}
+      <div>
+        <h1 className="text-lg font-semibold text-gray-800">
+          Welcome, {username}
+        </h1>
+      </div>
+
+      {/* Logout button */}
       <button
-        type="button"
-        className="p-2 bg-red-500 text-white rounded hover:bg-red-600"
         onClick={onLogout}
+        className="bg-red-500 hover:bg-red-600 transition-colors text-white px-4 py-2 rounded"
       >
         Logout
       </button>
-    </div>
+    </nav>
   );
 }

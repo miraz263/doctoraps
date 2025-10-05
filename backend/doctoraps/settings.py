@@ -85,7 +85,7 @@ WSGI_APPLICATION = 'doctoraps.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'doctoraps',
+        'NAME': 'doctoraps_db',
         'USER': 'mirazaps',
         'PASSWORD': 'saied263',
         'HOST': 'localhost',
@@ -152,3 +152,4 @@ SIMPLE_JWT = {
     'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
     'AUTH_HEADER_TYPES': ('Bearer',),
 }
+

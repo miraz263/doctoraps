@@ -47,10 +47,12 @@ class DoctorProfile(models.Model):
     consultation_fee = models.DecimalField(max_digits=10, decimal_places=2, default=0.0)
     working_hours = models.JSONField(default=dict, blank=True)
     bio = models.TextField(blank=True, null=True)
+    bmdc_no = models.CharField(max_length=50, blank=True, null=True)  # <-- new field
+    is_verified = models.BooleanField(default=False)  # <-- new field
     created_at = models.DateTimeField(default=timezone.now, editable=False)
 
     def __str__(self):
-        return f"Dr. {self.name} ({self.specialization})"
+        return f"Dr. {self.name or 'Unknown'} ({self.specialization})"
 
 
 class Patient(models.Model):

@@ -18,7 +18,7 @@ router = routers.DefaultRouter()
 router.register(r'tenants', TenantViewSet)
 router.register(r'users', UserViewSet)
 router.register(r'doctors', DoctorProfileViewSet)
-router.register(r'patients', PatientViewSet)
+router.register(r'patients', PatientViewSet)  # ✅ Includes PatientViewSet with 'me' route
 router.register(r'family', FamilyMemberViewSet)
 router.register(r'appointments', AppointmentViewSet)
 router.register(r'prescriptions', PrescriptionViewSet)
@@ -51,7 +51,6 @@ urlpatterns = [
     # Dashboard Stats API
     path('api/stats/', stats_view, name='stats'),
 
-    # Include DRF router endpoints
+    # Include all DRF router endpoints
     path('api/', include(router.urls)),
 ]
-
