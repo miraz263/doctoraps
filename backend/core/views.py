@@ -20,6 +20,21 @@ from .serializers import (
     PrescriptionSerializer, PaymentSerializer, DoctorAvailabilitySerializer
 )
 
+
+# -------------------------
+# Custom Permissions
+# -------------------------
+class IsAdminOrReadOnly(permissions.BasePermission):
+    """
+    Custom permission: only admin users can create/update/delete doctors.
+    Authenticated users can view.
+    """
+    def has_permission(self, request, view):
+        if request.method in permissions.SAFE_METHODS:  # GET, HEAD, OPTIONS
+            return request.user and request.user.is_authenticated
+        return getattr(request.user, "role", "") == "admin"
+
+
 # -------------------------
 # Django HTML Views
 # -------------------------
@@ -62,24 +77,22 @@ class UserViewSet(viewsets.ModelViewSet):
 class DoctorProfileViewSet(viewsets.ModelViewSet):
     queryset = DoctorProfile.objects.all()
     serializer_class = DoctorProfileSerializer
-    permission_classes = [permissions.IsAuthenticated]  # All authenticated users can view
-
-    def get_permissions(self):
-        if self.action in ["create", "update", "partial_update", "destroy"]:
-            # Only admin can create, update, delete doctors
-            permission_classes = [permissions.IsAuthenticated]
-        else:
-            permission_classes = [permissions.IsAuthenticated]
-        return [permission() for permission in permission_classes]
+    permission_classes = [IsAdminOrReadOnly]
 
     def create(self, request, *args, **kwargs):
         if getattr(request.user, "role", "") != "admin":
-            return Response({"error": "Only admin can add a doctor"}, status=status.HTTP_403_FORBIDDEN)
+            return Response(
+                {"error": "Only admin can add a doctor"},
+                status=status.HTTP_403_FORBIDDEN
+            )
         return super().create(request, *args, **kwargs)
 
     def partial_update(self, request, *args, **kwargs):
         if getattr(request.user, "role", "") != "admin":
-            return Response({"error": "Only admin can update a doctor"}, status=status.HTTP_403_FORBIDDEN)
+            return Response(
+                {"error": "Only admin can update a doctor"},
+                status=status.HTTP_403_FORBIDDEN
+            )
         return super().partial_update(request, *args, **kwargs)
 
 
@@ -95,7 +108,6 @@ class PatientViewSet(viewsets.ModelViewSet):
             patient = Patient.objects.get(user=request.user)
         except Patient.DoesNotExist:
             return Response({"detail": "Patient profile not found."}, status=404)
-
         serializer = self.get_serializer(patient)
         return Response(serializer.data)
 
