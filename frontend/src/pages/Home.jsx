@@ -1,57 +1,66 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
 
-export default function Home() {
-  const [stats, setStats] = useState({
-    doctors: 0,
-    patients: 0,
-    appointments: 0,
-    prescriptions: 0,
-  });
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+export default function Home({ username, role }) {
+  const [greeting, setGreeting] = useState("");
 
   useEffect(() => {
-    async function fetchStats() {
-      try {
-        setLoading(true);
-        const response = await axios.get("http://localhost:8000/api/stats/");
-        console.log("API Response:", response.data); // Debug
-        setStats(response.data);
-      } catch (err) {
-        console.error(err);
-        setError("Failed to load statistics.");
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchStats();
+    // Set a greeting based on time
+    const hour = new Date().getHours();
+    if (hour < 12) setGreeting("Good Morning");
+    else if (hour < 18) setGreeting("Good Afternoon");
+    else setGreeting("Good Evening");
   }, []);
 
-  if (loading) return <div>Loading...</div>;
-  if (error) return <div className="text-red-500">{error}</div>;
-
   return (
-    <div className="p-6">
-      <h1 className="text-3xl font-bold mb-6">Welcome to Doctor APS(Appointment and Prescription System)</h1>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-blue-600 text-white p-6 rounded-lg shadow-md">
-          <h2>Doctors</h2>
-          <p className="text-3xl font-bold">{stats.doctors}</p>
+    <div className="p-4">
+      <h1 className="text-2xl font-bold mb-4">
+        {greeting}, {username || "User"}!
+      </h1>
+
+      <p className="mb-4">
+        Welcome to your dashboard. Here you can see your summary and quick links.
+      </p>
+
+      {/* Role-based content */}
+      {role === "admin" && (
+        <div className="border p-4 rounded mb-4">
+          <h2 className="font-semibold mb-2">Admin Panel</h2>
+          <ul className="list-disc list-inside">
+            <li>Manage Doctors</li>
+            <li>Manage Patients</li>
+            <li>View Appointments</li>
+          </ul>
         </div>
-        <div className="bg-green-600 text-white p-6 rounded-lg shadow-md">
-          <h2>Patients</h2>
-          <p className="text-3xl font-bold">{stats.patients}</p>
+      )}
+
+      {role === "doctor" && (
+        <div className="border p-4 rounded mb-4">
+          <h2 className="font-semibold mb-2">Doctor Panel</h2>
+          <ul className="list-disc list-inside">
+            <li>View Your Patients</li>
+            <li>Manage Appointments</li>
+            <li>Prescribe Medications</li>
+          </ul>
         </div>
-        <div className="bg-yellow-500 text-white p-6 rounded-lg shadow-md">
-          <h2>Appointments</h2>
-          <p className="text-3xl font-bold">{stats.appointments}</p>
+      )}
+
+      {role === "patient" && (
+        <div className="border p-4 rounded mb-4">
+          <h2 className="font-semibold mb-2">Patient Panel</h2>
+          <ul className="list-disc list-inside">
+            <li>View Your Appointments</li>
+            <li>See Prescriptions</li>
+            <li>Contact Doctors</li>
+          </ul>
         </div>
-        <div className="bg-red-500 text-white p-6 rounded-lg shadow-md">
-          <h2>Prescriptions</h2>
-          <p className="text-3xl font-bold">{stats.prescriptions}</p>
+      )}
+
+      {role === "agent" && (
+        <div className="border p-4 rounded mb-4">
+          <h2 className="font-semibold mb-2">Agent Panel</h2>
+          <p>Manage your assigned patients or properties here.</p>
         </div>
-      </div>
+      )}
     </div>
   );
 }

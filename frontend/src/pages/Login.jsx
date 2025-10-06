@@ -1,12 +1,12 @@
 import React, { useState } from "react";
 import { loginUser, registerUser } from "../api";
 
-export default function Login({ setPage }) {
-  const [mode, setMode] = useState("login"); // "login" | "register"
+export default function Auth({ setIsAuthenticated, setRole }) {
+  const [mode, setMode] = useState("login"); // login | register
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState("doctor");
+  const [role, setLocalRole] = useState("doctor");
   const [message, setMessage] = useState("");
 
   const handleSubmit = async (e) => {
@@ -14,36 +14,27 @@ export default function Login({ setPage }) {
     setMessage("");
 
     try {
+      let data;
       if (mode === "login") {
-        const data = await loginUser(username, password, role);
-
-        if (data.error) throw new Error(data.error);
-
-        // Save token and username
-        localStorage.setItem("token", data.token);
-        localStorage.setItem("username", username);
-
-        // Save dashboard url for redirect
-        localStorage.setItem("dashboard_url", data.dashboard_url);
-
-        // Redirect to dashboard/home
-        window.location.href = data.dashboard_url;
+        data = await loginUser(username, password, role);
       } else {
-        // Register
-        const data = await registerUser(username, email, password, role);
-
-        if (data.error) throw new Error(data.error);
-
-        setMessage("Registration successful! Logging in...");
-        // Auto-login after registration
-        const loginData = await loginUser(username, password, role);
-
-        localStorage.setItem("token", loginData.token);
-        localStorage.setItem("username", username);
-        localStorage.setItem("dashboard_url", loginData.dashboard_url);
-
-        window.location.href = loginData.dashboard_url;
+        await registerUser(username, email, password, role);
+        data = await loginUser(username, password, role);
       }
+
+      if (data.error) throw new Error(data.error);
+
+      // ✅ Save token, role, username
+      localStorage.setItem("access_token", data.token);
+      localStorage.setItem("username", username);
+      localStorage.setItem("role", role);
+
+      // Update parent state
+      setIsAuthenticated(true);
+      setRole(role);
+
+      // Redirect to dashboard
+      window.location.href = data.dashboard_url;
     } catch (err) {
       setMessage(err.message || "Something went wrong");
     }
@@ -90,15 +81,14 @@ export default function Login({ setPage }) {
           required
         />
 
-        {/* Role Selection */}
         <select
           value={role}
-          onChange={(e) => setRole(e.target.value)}
+          onChange={(e) => setLocalRole(e.target.value)}
           className="w-full border p-2 mb-3 rounded"
         >
           <option value="doctor">Doctor</option>
           <option value="patient">Patient</option>
-          <option value="agent">Agent/Tennent</option>
+          <option value="agent">Agent/Tenant</option>
           <option value="management">Management</option>
           <option value="admin">Admin</option>
         </select>

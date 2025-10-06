@@ -1,8 +1,11 @@
+from django.contrib.auth import get_user_model
 from rest_framework import serializers
 from .models import (
-    Tenant, User, DoctorProfile, Patient, FamilyMember,
+    Tenant, DoctorProfile, Patient, FamilyMember,
     Appointment, Prescription, Payment, DoctorAvailability
 )
+
+User = get_user_model()
 
 # -------------------------
 # Tenant Serializer
@@ -37,17 +40,17 @@ class UserSerializer(serializers.ModelSerializer):
 class DoctorProfileSerializer(serializers.ModelSerializer):
     user_id = serializers.PrimaryKeyRelatedField(
         queryset=User.objects.all(),
-        source="user",
+        source='user',
         write_only=True
     )
-    # Only admins can set is_verified manually
-    is_verified = serializers.BooleanField(read_only=True)
+    is_verified = serializers.BooleanField(read_only=True)  # public cannot set this
 
     class Meta:
         model = DoctorProfile
         fields = [
             'id', 'user', 'user_id', 'name', 'specialization',
-            'consultation_fee', 'working_hours', 'bio', 'bmdc_no', 'is_verified', 'created_at'
+            'consultation_fee', 'working_hours', 'bio', 'bmdc_no',
+            'is_verified', 'created_at'
         ]
         read_only_fields = ['id', 'created_at', 'is_verified']
 
@@ -57,7 +60,6 @@ class DoctorProfileSerializer(serializers.ModelSerializer):
 
         if not user:
             raise serializers.ValidationError({'user_id': 'This field is required.'})
-
         if not specialization:
             raise serializers.ValidationError({'specialization': 'This field is required.'})
 
@@ -67,14 +69,12 @@ class DoctorProfileSerializer(serializers.ModelSerializer):
         else:
             if self.instance.user != user and DoctorProfile.objects.filter(user=user).exists():
                 raise serializers.ValidationError({'user_id': 'Another DoctorProfile already exists for this user.'})
-
         return attrs
 
     def create(self, validated_data):
         user = validated_data.get('user')
         if not validated_data.get('name'):
-            full_name = f"{user.first_name} {user.last_name}".strip()
-            validated_data['name'] = full_name or user.username or user.email or 'Doctor'
+            validated_data['name'] = f"{user.first_name} {user.last_name}".strip() or user.username or 'Doctor'
         return super().create(validated_data)
 
 # -------------------------

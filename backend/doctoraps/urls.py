@@ -7,4 +7,5 @@ urlpatterns = [
 
     # Include core app API and pages
     path('', include('core.urls')),
+    path('api/', include('appointments.urls')),
 ]

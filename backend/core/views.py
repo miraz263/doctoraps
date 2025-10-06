@@ -22,20 +22,6 @@ from .serializers import (
 
 
 # -------------------------
-# Custom Permissions
-# -------------------------
-class IsAdminOrReadOnly(permissions.BasePermission):
-    """
-    Custom permission: only admin users can create/update/delete doctors.
-    Authenticated users can view.
-    """
-    def has_permission(self, request, view):
-        if request.method in permissions.SAFE_METHODS:  # GET, HEAD, OPTIONS
-            return request.user and request.user.is_authenticated
-        return getattr(request.user, "role", "") == "admin"
-
-
-# -------------------------
 # Django HTML Views
 # -------------------------
 def login_view(request):
@@ -74,34 +60,80 @@ class UserViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
 
+# -------------------------
+# Custom Permissions
+# -------------------------
+class IsAdminOrReadOnly(permissions.BasePermission):
+    """
+    Custom permission: only admin users can modify data (create/update/delete),
+    others can only read (GET, HEAD, OPTIONS).
+    """
+    def has_permission(self, request, view):
+        if request.method in permissions.SAFE_METHODS:
+            return True
+        return getattr(request.user, "role", "") == "admin"
+
+
+# -------------------------
+# Doctor Profile ViewSet
+# -------------------------
 class DoctorProfileViewSet(viewsets.ModelViewSet):
-    queryset = DoctorProfile.objects.all()
     serializer_class = DoctorProfileSerializer
     permission_classes = [IsAdminOrReadOnly]
+    queryset = DoctorProfile.objects.all()
 
+    def get_permissions(self):
+        # Public can view list and retrieve
+        if self.action in ["list", "retrieve"]:
+            return [permissions.AllowAny()]
+        return [IsAdminOrReadOnly()]
+
+    def get_queryset(self):
+        # Public: only show verified doctors
+        if self.action in ["list", "retrieve"]:
+            return DoctorProfile.objects.filter(is_verified=True)
+        # Admin: show all doctors
+        return DoctorProfile.objects.all()
+
+    # ---------------------
+    # Admin or Management Only
+    # ---------------------
     def create(self, request, *args, **kwargs):
-        if getattr(request.user, "role", "") != "admin":
-            return Response(
-                {"error": "Only admin can add a doctor"},
-                status=status.HTTP_403_FORBIDDEN
-            )
+        if getattr(request.user, "role", "") not in ["admin", "management"]:
+            return Response({"error": "Only admin or management can add a doctor."},
+                            status=status.HTTP_403_FORBIDDEN)
         return super().create(request, *args, **kwargs)
+
+    # ---------------------
+    # Admin Only Updates/Deletes
+    # ---------------------
+    def update(self, request, *args, **kwargs):
+        if getattr(request.user, "role", "") != "admin":
+            return Response({"error": "Only admin can update a doctor."},
+                            status=status.HTTP_403_FORBIDDEN)
+        return super().update(request, *args, **kwargs)
 
     def partial_update(self, request, *args, **kwargs):
         if getattr(request.user, "role", "") != "admin":
-            return Response(
-                {"error": "Only admin can update a doctor"},
-                status=status.HTTP_403_FORBIDDEN
-            )
+            return Response({"error": "Only admin can update a doctor."},
+                            status=status.HTTP_403_FORBIDDEN)
         return super().partial_update(request, *args, **kwargs)
 
+    def destroy(self, request, *args, **kwargs):
+        if getattr(request.user, "role", "") != "admin":
+            return Response({"error": "Only admin can delete a doctor."},
+                            status=status.HTTP_403_FORBIDDEN)
+        return super().destroy(request, *args, **kwargs)
 
+
+# -------------------------
+# Other ViewSets
+# -------------------------
 class PatientViewSet(viewsets.ModelViewSet):
     queryset = Patient.objects.all()
     serializer_class = PatientSerializer
     permission_classes = [permissions.IsAuthenticated]
 
-    # ✅ Custom route to get only the logged-in patient's profile
     @action(detail=False, methods=['get'])
     def me(self, request):
         try:
@@ -152,7 +184,7 @@ def home(request):
 
 
 # -------------------------
-# DRF API - User Registration
+# User Registration
 # -------------------------
 class RegisterView(APIView):
     permission_classes = [permissions.AllowAny]
@@ -165,10 +197,12 @@ class RegisterView(APIView):
         role = request.data.get("role", "patient")
 
         if not username or not password:
-            return Response({"error": "Username and password are required"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "Username and password are required"},
+                            status=status.HTTP_400_BAD_REQUEST)
 
         if User.objects.filter(username=username).exists():
-            return Response({"error": "Username already taken"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "Username already taken"},
+                            status=status.HTTP_400_BAD_REQUEST)
 
         user = User.objects.create(
             username=username,
@@ -188,14 +222,15 @@ class RegisterView(APIView):
 
 
 # -------------------------
-# DRF API - Doctor Registration (Admin Only)
+# Doctor Registration (Admin Only)
 # -------------------------
 class DoctorRegisterView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
         if getattr(request.user, "role", "") != "admin":
-            return Response({"error": "Only admin can register a doctor"}, status=status.HTTP_403_FORBIDDEN)
+            return Response({"error": "Only admin can register a doctor"},
+                            status=status.HTTP_403_FORBIDDEN)
 
         user_id = request.data.get("user_id")
         specialization = request.data.get("specialization", "General")
@@ -204,7 +239,8 @@ class DoctorRegisterView(APIView):
         try:
             user = User.objects.get(id=user_id)
             if DoctorProfile.objects.filter(user=user).exists():
-                return Response({"error": "This user is already registered as a doctor"}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"error": "This user is already registered as a doctor"},
+                                status=status.HTTP_400_BAD_REQUEST)
 
             doctor_profile = DoctorProfile.objects.create(
                 user=user,
@@ -213,6 +249,7 @@ class DoctorRegisterView(APIView):
             )
             serializer = DoctorProfileSerializer(doctor_profile)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
+
         except User.DoesNotExist:
             return Response({"error": "User not found"}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
@@ -220,14 +257,15 @@ class DoctorRegisterView(APIView):
 
 
 # -------------------------
-# DRF API - Update Doctor (Admin Only)
+# Update Doctor (Admin Only)
 # -------------------------
 class DoctorUpdateView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def patch(self, request, pk):
         if getattr(request.user, "role", "") != "admin":
-            return Response({"error": "Only admin can update doctor"}, status=status.HTTP_403_FORBIDDEN)
+            return Response({"error": "Only admin can update doctor"},
+                            status=status.HTTP_403_FORBIDDEN)
 
         try:
             doctor = DoctorProfile.objects.get(id=pk)
@@ -245,14 +283,15 @@ class DoctorUpdateView(APIView):
 
 
 # -------------------------
-# DRF API - Approve/Reject Doctor (Admin Only)
+# Approve/Reject Doctor (Admin Only)
 # -------------------------
 class DoctorApproveView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request, pk):
         if getattr(request.user, "role", "") != "admin":
-            return Response({"error": "Only admin can approve/reject doctor"}, status=status.HTTP_403_FORBIDDEN)
+            return Response({"error": "Only admin can approve/reject doctor"},
+                            status=status.HTTP_403_FORBIDDEN)
 
         try:
             doctor = DoctorProfile.objects.get(id=pk)
@@ -261,16 +300,20 @@ class DoctorApproveView(APIView):
 
         approve = request.data.get("approve")
         if approve is None:
-            return Response({"error": "'approve' field is required (true/false)"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "'approve' field is required (true/false)"},
+                            status=status.HTTP_400_BAD_REQUEST)
 
         doctor.is_verified = bool(approve)
         doctor.save()
         status_text = "approved" if doctor.is_verified else "rejected"
-        return Response({"message": f"Doctor has been {status_text}", "doctor": DoctorProfileSerializer(doctor).data}, status=status.HTTP_200_OK)
+        return Response({
+            "message": f"Doctor has been {status_text}",
+            "doctor": DoctorProfileSerializer(doctor).data
+        }, status=status.HTTP_200_OK)
 
 
 # -------------------------
-# DRF API - Login with role
+# Login API with Role
 # -------------------------
 class LoginAPIView(APIView):
     permission_classes = [permissions.AllowAny]

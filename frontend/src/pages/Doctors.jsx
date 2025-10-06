@@ -1,336 +1,198 @@
-import { useEffect, useMemo, useState } from "react";
+import React, { useState, useEffect } from "react";
+import axios from "axios";
 
-function errText(err) {
-  try {
-    if (!err?.message) return "Network error";
-    return err.message;
-  } catch {
-    return "Request failed.";
-  }
-}
-
-export default function DoctorsPage({ username, role }) {
+export default function Doctors({ username, role }) {
   const [doctors, setDoctors] = useState([]);
   const [loadingDoctors, setLoadingDoctors] = useState(true);
   const [doctorsError, setDoctorsError] = useState(null);
 
-  const [users, setUsers] = useState([]);
-  const [loadingUsers, setLoadingUsers] = useState(false);
-  const [usersError, setUsersError] = useState(null);
-
-  const [q, setQ] = useState("");
-  const [userId, setUserId] = useState("");
   const [formData, setFormData] = useState({
-    specialization: "",
     name: "",
-    email: "",
-    phone: "",
+    specialization: "",
+    consultation_fee: "",
     bmdc_no: "",
   });
 
-  const [submitError, setSubmitError] = useState(null);
-  const [success, setSuccess] = useState(null);
-  const [submitting, setSubmitting] = useState(false);
+  const [editingDoctorId, setEditingDoctorId] = useState(null);
 
-  // ✅ Get token and prepare Authorization header
-  const token = localStorage.getItem("access");
-  const authHeader = { 
-    "Authorization": `Bearer ${token}`, 
-    "Content-Type": "application/json" 
-  };
+  // ✅ Use the correct token key
+  const token = localStorage.getItem("access_token");
 
-  // Fetch all doctors
-  const fetchDoctors = async () => {
-    if (!token) return setDoctorsError("No access token found.");
-    try {
+  // Fetch doctors list
+  useEffect(() => {
+    const fetchDoctors = async () => {
       setLoadingDoctors(true);
       setDoctorsError(null);
-      const res = await fetch("http://localhost:8000/api/doctors/", { headers: authHeader });
-      if (!res.ok) throw new Error(`Failed to fetch doctors: ${res.status}`);
-      const data = await res.json();
-      setDoctors(data);
-    } catch (err) {
-      setDoctorsError(errText(err));
-    } finally {
-      setLoadingDoctors(false);
-    }
-  };
 
-  useEffect(() => { fetchDoctors(); }, [token]);
-
-  const doctorUserIds = useMemo(() => doctors.map((doc) => doc.user), [doctors]);
-
-  // Fetch all users (admin only)
-  useEffect(() => {
-    if (role !== "admin" || !token) return;
-    let cancelled = false;
-    const loadUsers = async (url = "http://localhost:8000/api/users/") => {
-      setLoadingUsers(true);
       try {
-        const all = [];
-        while (url) {
-          const res = await fetch(url, { headers: authHeader });
-          if (!res.ok) throw new Error("Failed to fetch users");
-          const data = await res.json();
-          all.push(...(Array.isArray(data) ? data : data.results || []));
-          url = data?.next || null;
-        }
-        if (!cancelled) setUsers(all);
+        if (!token) throw new Error("No access token found.");
+
+        const response = await axios.get("http://127.0.0.1:8000/api/doctors/", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        setDoctors(response.data);
       } catch (err) {
-        if (!cancelled) setUsersError(errText(err));
+        setDoctorsError(err.response?.data?.detail || err.message);
       } finally {
-        if (!cancelled) setLoadingUsers(false);
+        setLoadingDoctors(false);
       }
     };
-    loadUsers();
-    return () => (cancelled = true);
-  }, [role, token]);
 
-  const filteredUsers = useMemo(() => {
-    if (!q) return users;
-    const search = q.toLowerCase();
-    return users.filter(
-      (u) =>
-        (u.username && u.username.toLowerCase().includes(search)) ||
-        (u.email && u.email.toLowerCase().includes(search)) ||
-        String(u.id).includes(search)
-    );
-  }, [q, users]);
+    fetchDoctors();
+  }, [token]);
 
-  // Add doctor (admin only)
+  // Handle input change
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  // Add or update doctor
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setSubmitError(null); setSuccess(null);
-
-    if (!userId || !formData.specialization.trim() || !formData.bmdc_no.trim()) {
-      setSubmitError("User ID, Specialization এবং BMDC Number প্রয়োজন।");
-      return;
-    }
-    if (doctorUserIds.includes(Number(userId))) {
-      setSubmitError("This user is already registered as a doctor."); 
-      return;
-    }
+    if (!token) return alert("No access token found.");
 
     try {
-      setSubmitting(true);
-      const payload = {
-        user_id: Number(userId),
-        specialization: formData.specialization.trim(),
-        name: formData.name || undefined,
-        email: formData.email || undefined,
-        phone: formData.phone || "",
-        bmdc_no: formData.bmdc_no || "",
-      };
-
-      const res = await fetch("http://localhost:8000/api/doctors/register/", {
-        method: "POST",
-        headers: authHeader,
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => null);
-        throw new Error(data?.error || "Doctor registration failed");
+      if (editingDoctorId) {
+        // Update doctor
+        await axios.put(
+          `http://127.0.0.1:8000/api/doctors/${editingDoctorId}/`,
+          formData,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        setEditingDoctorId(null);
+      } else {
+        // Add doctor
+        await axios.post("http://127.0.0.1:8000/api/doctors/", formData, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
       }
 
-      setSuccess("Doctor added successfully!");
-      setFormData({ specialization: "", name: "", email: "", phone: "", bmdc_no: "" });
-      setUserId("");
-      fetchDoctors();
-    } catch (err) { setSubmitError(errText(err)); }
-    finally { setSubmitting(false); }
+      // Refresh list
+      const response = await axios.get("http://127.0.0.1:8000/api/doctors/", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setDoctors(response.data);
+
+      // Reset form
+      setFormData({ name: "", specialization: "", consultation_fee: "", bmdc_no: "" });
+    } catch (err) {
+      alert(err.response?.data?.detail || err.message);
+    }
   };
 
-  // Inline edit (admin only)
-  const handleUpdateDoctor = async (id, field, value) => {
-    if (role !== "admin") return;
-    try {
-      const res = await fetch(`http://localhost:8000/api/doctors/${id}/update/`, {
-        method: "PATCH",
-        headers: authHeader,
-        body: JSON.stringify({ [field]: value }),
-      });
-      if (!res.ok) throw new Error("Failed to update doctor");
-      setDoctors((prev) => prev.map((d) => (d.id === id ? { ...d, [field]: value } : d)));
-    } catch (err) { alert(errText(err)); }
+  // Edit doctor
+  const handleEdit = (doctor) => {
+    setEditingDoctorId(doctor.id);
+    setFormData({
+      name: doctor.name,
+      specialization: doctor.specialization,
+      consultation_fee: doctor.consultation_fee,
+      bmdc_no: doctor.bmdc_no,
+    });
   };
 
-  // Approve/Reject (admin only)
-  const handleApproveReject = async (id, approve = true) => {
-    if (role !== "admin") return;
+  // Delete doctor
+  const handleDelete = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this doctor?")) return;
+    if (!token) return alert("No access token found.");
+
     try {
-      const res = await fetch(`http://localhost:8000/api/doctors/${id}/approve/`, {
-        method: "POST",
-        headers: authHeader,
-        body: JSON.stringify({ approve }),
+      await axios.delete(`http://127.0.0.1:8000/api/doctors/${id}/`, {
+        headers: { Authorization: `Bearer ${token}` },
       });
-      if (!res.ok) throw new Error("Failed to update status");
-      setDoctors((prev) =>
-        prev.map((d) => (d.id === id ? { ...d, approved: approve } : d))
-      );
-    } catch (err) { alert(errText(err)); }
+      setDoctors(doctors.filter((doc) => doc.id !== id));
+    } catch (err) {
+      alert(err.response?.data?.detail || err.message);
+    }
   };
 
   return (
-    <div className="p-6">
-      <h1 className="text-3xl font-bold mb-6">Doctors Management</h1>
+    <div className="p-4">
+      <h1 className="text-xl font-bold mb-4">Doctors</h1>
 
-      {/* Admin-only Add Doctor Form */}
+      {loadingDoctors && <p>Loading doctors...</p>}
+      {doctorsError && <p className="text-red-500">{doctorsError}</p>}
+      {!loadingDoctors && doctors.length === 0 && <p>No doctors found.</p>}
+
+      {/* Admin Add/Edit Form */}
       {role === "admin" && (
-        <div className="mb-6 p-6 bg-white rounded shadow-md max-w-md">
-          <h2 className="text-xl font-bold mb-4">Add Doctor</h2>
-          {submitError && <p className="text-red-500 mb-2">{submitError}</p>}
-          {success && <p className="text-green-500 mb-2">{success}</p>}
+        <form onSubmit={handleSubmit} className="mb-6 border p-4 rounded">
+          <h2 className="font-semibold mb-2">
+            {editingDoctorId ? "Edit Doctor" : "Add Doctor"}
+          </h2>
 
-          <div className="mb-3">
-            <label className="block font-medium mb-1">Search users</label>
-            <input
-              type="text"
-              placeholder="username/email/id"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              className="border p-2 w-full rounded"
-            />
-          </div>
+          <input
+            name="name"
+            placeholder="Name"
+            value={formData.name}
+            onChange={handleChange}
+            className="border p-2 mb-2 w-full rounded"
+            required
+          />
+          <input
+            name="specialization"
+            placeholder="Specialization"
+            value={formData.specialization}
+            onChange={handleChange}
+            className="border p-2 mb-2 w-full rounded"
+            required
+          />
+          <input
+            name="consultation_fee"
+            placeholder="Consultation Fee"
+            value={formData.consultation_fee}
+            onChange={handleChange}
+            className="border p-2 mb-2 w-full rounded"
+            required
+          />
+          <input
+            name="bmdc_no"
+            placeholder="BMDC No"
+            value={formData.bmdc_no}
+            onChange={handleChange}
+            className="border p-2 mb-2 w-full rounded"
+            required
+          />
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <select
-              value={userId}
-              onChange={(e) => setUserId(e.target.value)}
-              className="border p-2 w-full rounded"
-              disabled={loadingUsers}
-            >
-              <option value="">
-                {loadingUsers ? "Loading users..." : "Select a user"}
-              </option>
-              {filteredUsers.map((u) => (
-                <option key={u.id} value={u.id} disabled={doctorUserIds.includes(u.id)}>
-                  {u.username || u.email || `user#${u.id}`}
-                  {doctorUserIds.includes(u.id) ? " (Already a doctor)" : ""}
-                </option>
-              ))}
-            </select>
-
-            <input
-              type="text"
-              placeholder="Specialization"
-              value={formData.specialization}
-              onChange={(e) => setFormData({ ...formData, specialization: e.target.value })}
-              className="border p-2 w-full rounded"
-            />
-            <input
-              type="text"
-              placeholder="Doctor Name (optional)"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              className="border p-2 w-full rounded"
-            />
-            <input
-              type="text"
-              placeholder="BMDC Number"
-              value={formData.bmdc_no}
-              onChange={(e) => setFormData({ ...formData, bmdc_no: e.target.value })}
-              className="border p-2 w-full rounded"
-            />
-            <input
-              type="email"
-              placeholder="Email (optional)"
-              value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              className="border p-2 w-full rounded"
-            />
-            <input
-              type="text"
-              placeholder="Phone (optional)"
-              value={formData.phone}
-              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-              className="border p-2 w-full rounded"
-            />
-
-            <button
-              type="submit"
-              disabled={!userId || !formData.specialization.trim() || !formData.bmdc_no.trim() || submitting}
-              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:opacity-60"
-            >
-              {submitting ? "Adding..." : "Add Doctor"}
-            </button>
-          </form>
-        </div>
+          <button
+            type="submit"
+            className="bg-blue-600 text-white py-2 px-4 rounded"
+          >
+            {editingDoctorId ? "Update" : "Add"}
+          </button>
+        </form>
       )}
 
-      {/* Doctors Table */}
-      <div className="overflow-x-auto bg-white rounded shadow-md p-4">
-        <h2 className="text-xl font-bold mb-4">Doctors List</h2>
-        {loadingDoctors ? (
-          <div className="flex justify-center items-center h-32">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
-          </div>
-        ) : doctorsError ? (
-          <p className="text-red-500 break-words">{doctorsError}</p>
-        ) : doctors.length === 0 ? (
-          <p className="text-gray-500">No doctors found.</p>
-        ) : (
-          <table className="min-w-full bg-white rounded-lg shadow-md border border-gray-200">
-            <thead className="bg-blue-600 text-white">
-              <tr>
-                <th className="px-6 py-3 text-left">ID</th>
-                <th className="px-6 py-3 text-left">Name</th>
-                <th className="px-6 py-3 text-left">Specialization</th>
-                <th className="px-6 py-3 text-left">BMDC No</th>
-                <th className="px-6 py-3 text-left">Email</th>
-                <th className="px-6 py-3 text-left">Phone</th>
-                <th className="px-6 py-3 text-left">Status</th>
-                {role === "admin" && <th className="px-6 py-3 text-left">Actions</th>}
-              </tr>
-            </thead>
-            <tbody>
-              {doctors.map((doc) => (
-                <tr key={doc.id} className="border-b hover:bg-blue-50 transition-colors">
-                  <td className="px-6 py-3">{doc.id}</td>
-                  <td className="px-6 py-3">{role === "admin" ? <input
-                    value={doc.name || ""}
-                    onChange={(e) => handleUpdateDoctor(doc.id, "name", e.target.value)}
-                    className="border p-1 w-full rounded"
-                  /> : doc.name}</td>
-                  <td className="px-6 py-3">{role === "admin" ? <input
-                    value={doc.specialization || ""}
-                    onChange={(e) => handleUpdateDoctor(doc.id, "specialization", e.target.value)}
-                    className="border p-1 w-full rounded"
-                  /> : doc.specialization}</td>
-                  <td className="px-6 py-3">{role === "admin" ? <input
-                    value={doc.bmdc_no || ""}
-                    onChange={(e) => handleUpdateDoctor(doc.id, "bmdc_no", e.target.value)}
-                    className="border p-1 w-full rounded"
-                  /> : doc.bmdc_no}</td>
-                  <td className="px-6 py-3">{role === "admin" ? <input
-                    value={doc.email || ""}
-                    onChange={(e) => handleUpdateDoctor(doc.id, "email", e.target.value)}
-                    className="border p-1 w-full rounded"
-                  /> : doc.email}</td>
-                  <td className="px-6 py-3">{role === "admin" ? <input
-                    value={doc.phone || ""}
-                    onChange={(e) => handleUpdateDoctor(doc.id, "phone", e.target.value)}
-                    className="border p-1 w-full rounded"
-                  /> : doc.phone}</td>
-                  <td className="px-6 py-3">
-                    {doc.approved ? <span className="text-green-600 font-medium">Approved</span>
-                    : <span className="text-yellow-600 font-medium">Pending</span>}
-                  </td>
-                  {role === "admin" && <td className="px-6 py-3 space-x-2">
-                    {!doc.approved ? <button
-                      onClick={() => handleApproveReject(doc.id, true)}
-                      className="bg-green-500 text-white px-2 py-1 rounded hover:bg-green-600"
-                    >Approve</button> : <button
-                      onClick={() => handleApproveReject(doc.id, false)}
-                      className="bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600"
-                    >Reject</button>}
-                  </td>}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+      {/* Doctors List */}
+      <ul className="space-y-2">
+        {doctors.map((doc) => (
+          <li
+            key={doc.id}
+            className="border p-2 rounded flex justify-between items-center"
+          >
+            <span>
+              {doc.name} - {doc.specialization} - Fee: {doc.consultation_fee}
+            </span>
+            {role === "admin" && (
+              <div>
+                <button
+                  onClick={() => handleEdit(doc)}
+                  className="bg-yellow-500 text-white px-2 py-1 rounded mr-2"
+                >
+                  Edit
+                </button>
+                <button
+                  onClick={() => handleDelete(doc.id)}
+                  className="bg-red-600 text-white px-2 py-1 rounded"
+                >
+                  Delete
+                </button>
+              </div>
+            )}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

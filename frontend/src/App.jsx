@@ -7,8 +7,8 @@ import Doctors from "./pages/Doctors";
 import Patients from "./pages/Patients";
 import Appointments from "./pages/Appointments";
 import Prescriptions from "./pages/Prescriptions";
-import Auth from "./components/Auth"; // Login/Register component
-import LandingPage from "./pages/LandingPage"; // New landing page
+import Auth from "./components/Auth";
+import LandingPage from "./pages/LandingPage";
 import { UserProvider } from "./components/UserContext";
 
 export default function App() {
@@ -16,9 +16,6 @@ export default function App() {
   const [role, setRole] = useState("");
   const [page, setPage] = useState("landing"); // landing | auth
 
-  // -------------------------
-  // Check authentication on load
-  // -------------------------
   useEffect(() => {
     const token = localStorage.getItem("access_token");
     const savedRole = localStorage.getItem("role");
@@ -28,50 +25,44 @@ export default function App() {
     }
   }, []);
 
-  // -------------------------
-  // Logout handler
-  // -------------------------
   const handleLogout = () => {
     localStorage.clear();
     setIsAuthenticated(false);
     setRole("");
-    setPage("landing"); // redirect to landing page after logout
+    setPage("landing");
   };
 
-  // -------------------------
-  // Role-based dashboard URL
-  // -------------------------
   const getDashboardUrl = () => {
     switch (role) {
       case "doctor":
         return "/doctors";
       case "patient":
         return "/patients";
+      case "admin":
+        return "/doctors";
       default:
         return "/home";
     }
   };
 
-  // -------------------------
-  // Show authenticated app with dashboard
-  // -------------------------
   if (isAuthenticated) {
     return (
       <UserProvider>
         <BrowserRouter>
           <Dashboard onLogout={handleLogout}>
             <Routes>
-              {/* Default route */}
               <Route path="/" element={<Navigate to={getDashboardUrl()} replace />} />
-
-              {/* Main pages */}
-              <Route path="/home" element={<Home />} />
-              <Route path="/doctors" element={<Doctors />} />
-              <Route path="/patients" element={<Patients />} />
-              <Route path="/appointments" element={<Appointments />} />
-              <Route path="/prescriptions" element={<Prescriptions />} />
-
-              {/* Catch-all unknown routes */}
+              <Route
+                path="/home"
+                element={<Home username={localStorage.getItem("username")} role={role} />}
+              />
+              <Route
+                path="/doctors"
+                element={<Doctors username={localStorage.getItem("username")} role={role} />}
+              />
+              <Route path="/patients" element={<Patients role={role} />} />
+              <Route path="/appointments" element={<Appointments role={role} />} />
+              <Route path="/prescriptions" element={<Prescriptions role={role} />} />
               <Route path="*" element={<Navigate to={getDashboardUrl()} replace />} />
             </Routes>
           </Dashboard>
@@ -80,9 +71,6 @@ export default function App() {
     );
   }
 
-  // -------------------------
-  // Show landing or login/register for unauthenticated users
-  // -------------------------
   return page === "landing" ? (
     <LandingPage goToLogin={() => setPage("auth")} />
   ) : (
